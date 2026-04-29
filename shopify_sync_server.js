@@ -6,7 +6,7 @@ const converter = require("./odoo_matrixify_converter.js");
 
 const PORT = Number(process.env.PORT || 3456);
 const API_VERSION = "2026-04";
-const HOST = "127.0.0.1";
+const HOST = process.env.HOST || "0.0.0.0";
 const MAX_JSON_BODY_BYTES = 100 * 1024 * 1024;
 const FREE_ORDER_LIMIT = 10;
 const PER_THOUSAND_PRICE_USD_CENTS = 1000;

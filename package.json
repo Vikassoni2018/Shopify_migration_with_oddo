@@ -1,0 +1,13 @@
+{
+  "name": "shopify-migration-with-odoo",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Odoo to Shopify migration sync web app",
+  "main": "shopify_sync_server.js",
+  "scripts": {
+    "start": "node shopify_sync_server.js"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

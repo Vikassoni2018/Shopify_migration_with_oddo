@@ -255,6 +255,12 @@
             "Notes": "Preserved in the note because the Shopify customer template has no direct currency column."
         },
         {
+            "Source Column": "Payment Status / Payment Terms",
+            "Shopify Column / Handling": "Tags, Note",
+            "Action": "Derived",
+            "Notes": "Payment metadata is copied into customer tags and note to mirror order-level payment tracking."
+        },
+        {
             "Source Column": "Zip",
             "Shopify Column / Handling": "Default Address Zip",
             "Action": "Renamed",
@@ -728,6 +734,7 @@
             var email = isLikelyEmail(row["Email"]) ? getStringValue(row["Email"]) : "";
             var company = getStringValue(row["Company"]) || getStringValue(row["Parent name"]);
             var note = buildCustomerNote(row);
+            var paymentProfile = buildCustomerPaymentProfile(row);
 
             if (record.hasOwnProperty("First Name")) {
                 record["First Name"] = nameParts.firstName;
@@ -772,10 +779,10 @@
                 record["Accepts SMS Marketing"] = "no";
             }
             if (record.hasOwnProperty("Tags")) {
-                record["Tags"] = "";
+                record["Tags"] = paymentProfile.tags;
             }
             if (record.hasOwnProperty("Note")) {
-                record["Note"] = note;
+                record["Note"] = [note, paymentProfile.note].filter(Boolean).join("\n");
             }
             if (record.hasOwnProperty("Tax Exempt")) {
                 record["Tax Exempt"] = "no";
@@ -783,6 +790,38 @@
 
             return record;
         });
+    }
+
+    function buildCustomerPaymentProfile(row) {
+        var paymentStatus = getStringValue(row["Payment Status"]) || getStringValue(row["payment_status"]);
+        var paymentTerms = getStringValue(row["Payment Terms"]) || getStringValue(row["payment_terms"]) || getStringValue(row["Payment Term"]);
+        var paymentReference = getStringValue(row["Payment Reference"]) || getStringValue(row["payment_reference"]);
+        var tags = [];
+        var noteParts = [];
+
+        if (paymentStatus) {
+            tags.push("odoo_payment_status:" + slugifyTagValue(paymentStatus));
+            noteParts.push("Payment Status: " + paymentStatus);
+        }
+        if (paymentTerms) {
+            tags.push("odoo_payment_terms:" + slugifyTagValue(paymentTerms));
+            noteParts.push("Payment Terms: " + paymentTerms);
+        }
+        if (paymentReference) {
+            noteParts.push("Payment Reference: " + paymentReference);
+        }
+
+        return {
+            tags: tags.join(", "),
+            note: noteParts.join(" | ")
+        };
+    }
+
+    function slugifyTagValue(value) {
+        return getStringValue(value)
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, "_")
+            .replace(/^_+|_+$/g, "");
     }
 
     function buildOrders(sourceRows) {

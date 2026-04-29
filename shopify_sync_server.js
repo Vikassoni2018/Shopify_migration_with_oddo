@@ -902,7 +902,17 @@ function handleStaticRequest(request, response) {
     const url = new URL(request.url, `http://${request.headers.host}`);
 
     if (url.pathname === "/" || url.pathname === "/index.html") {
+        sendFile(response, path.join(__dirname, "frontend_pages.html"));
+        return;
+    }
+
+    if (url.pathname === "/migration-tool") {
         sendFile(response, path.join(__dirname, "odoo_matrixify_browser.html"));
+        return;
+    }
+
+    if (url.pathname === "/admin") {
+        sendFile(response, path.join(__dirname, "admin_panel.html"));
         return;
     }
 

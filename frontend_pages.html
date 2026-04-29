@@ -1,0 +1,16 @@
+<!doctype html><html><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><title>Odoo to Shopify Migration</title><style>body{font-family:Arial,sans-serif;margin:0;background:#f6f7fb;color:#1b1f2a}header{background:#0a3d62;color:#fff;padding:14px 20px;display:flex;gap:18px;align-items:center}header a{color:#fff;text-decoration:none;font-weight:700}.container{max-width:1000px;margin:24px auto;padding:0 16px}.card{background:#fff;border-radius:10px;padding:18px;margin-bottom:16px;box-shadow:0 2px 8px rgba(0,0,0,.08)}h1,h2{margin-top:0}.steps li{margin:8px 0}iframe{width:100%;height:760px;border:1px solid #ddd;border-radius:8px}</style></head><body>
+<header><strong>Migration Portal</strong><a href='#home'>Home</a><a href='#migration'>Migration</a><a href='/admin'>Admin Panel</a></header>
+<div class='container'>
+<section id='home' class='card'>
+<h1>Odoo to Shopify Migration</h1>
+<p>This app helps you migrate Odoo order data into Shopify with preview, conversion, and import flow.</p>
+<h2>App functionality</h2><ul class='steps'><li>Upload Odoo CSV and preview converted rows.</li><li>Generate Matrixify compatible CSV files.</li><li>Run Shopify order create/update import flow.</li></ul>
+<h2>How to create Shopify token</h2><ol class='steps'><li>Open Shopify Admin → Apps and sales channels.</li><li>Create/select a custom app.</li><li>Grant Admin API scopes: <code>read_orders</code>, <code>write_orders</code>.</li><li>Install app and copy Admin API access token.</li></ol>
+<h2>How to set domain (with visualization)</h2><p>Use your store domain in this format: <code>your-store.myshopify.com</code>. Example URL visualization: <code>https://your-store.myshopify.com/admin</code>.</p>
+</section>
+<section id='migration' class='card'>
+<h2>Migration</h2><p>Below is the currently available migration page and payment flow support.</p>
+<iframe src='/migration-tool' title='Migration Tool'></iframe>
+</section></div>
+<script>const hash=location.hash||'#home';document.querySelectorAll('section.card').forEach(s=>s.style.display='#'+s.id===hash?'block':'none');addEventListener('hashchange',()=>{const h=location.hash||'#home';document.querySelectorAll('section.card').forEach(s=>s.style.display='#'+s.id===h?'block':'none');});</script>
+</body></html>

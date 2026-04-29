@@ -1,0 +1,14 @@
+<!doctype html><html><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><title>Admin Panel</title><style>body{font-family:Arial;background:#f5f6fa;margin:0}.wrap{max-width:760px;margin:26px auto;padding:0 16px}.card{background:#fff;border-radius:10px;padding:18px;box-shadow:0 2px 8px rgba(0,0,0,.08);margin-bottom:14px}input{width:100%;padding:10px;margin:6px 0 10px;border:1px solid #ccc;border-radius:8px}button{padding:10px 14px;border:0;background:#0a3d62;color:#fff;border-radius:8px;cursor:pointer}.hidden{display:none}</style></head><body><div class='wrap'>
+<div id='login' class='card'><h2>Admin Login</h2><input id='email' placeholder='Email'><input id='password' type='password' placeholder='Password'><button onclick='login()'>Login</button><p id='msg'></p></div>
+<div id='panel' class='hidden'>
+<div class='card'><h2>Dashboard</h2><p>Welcome to admin dashboard for migration management.</p></div>
+<div class='card'><h2>Payment Setting</h2><label>Stripe Publishable Key</label><input id='pk' placeholder='pk_live_...'><label>Stripe Secret Key</label><input id='sk' placeholder='sk_live_...'><button onclick='saveKeys()'>Save Stripe Keys</button><p id='saved'></p></div>
+<div class='card'><button onclick='logout()'>Logout</button></div></div></div>
+<script>
+const ADMIN_EMAIL='vikassoni2018@gmail.com';const ADMIN_PASSWORD='Admin@123';
+if(localStorage.getItem('admin_auth')==='1'){showPanel();}
+function login(){const e=document.getElementById('email').value.trim();const p=document.getElementById('password').value;document.getElementById('msg').textContent=(e===ADMIN_EMAIL&&p===ADMIN_PASSWORD)?(localStorage.setItem('admin_auth','1'),'Login successful'): 'Invalid credentials';if(e===ADMIN_EMAIL&&p===ADMIN_PASSWORD)showPanel();}
+function showPanel(){document.getElementById('login').classList.add('hidden');document.getElementById('panel').classList.remove('hidden');document.getElementById('pk').value=localStorage.getItem('stripe_pk')||'';document.getElementById('sk').value=localStorage.getItem('stripe_sk')||'';}
+function saveKeys(){localStorage.setItem('stripe_pk',document.getElementById('pk').value.trim());localStorage.setItem('stripe_sk',document.getElementById('sk').value.trim());document.getElementById('saved').textContent='Stripe keys updated.';}
+function logout(){localStorage.removeItem('admin_auth');location.reload();}
+</script></body></html>

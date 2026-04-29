@@ -1,0 +1,1295 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Odoo to Shopify Order Sync</title>
+    <style>
+        :root {
+            --bg: #f2ede4;
+            --paper: rgba(255, 251, 246, 0.92);
+            --ink: #1d2430;
+            --muted: #6f695f;
+            --accent: #005f73;
+            --accent-soft: #d6ecef;
+            --accent-strong: #0a9396;
+            --sun: #ee9b00;
+            --line: rgba(29, 36, 48, 0.12);
+            --danger: #b93842;
+            --success: #2b7a43;
+            --shadow: 0 24px 48px rgba(33, 52, 73, 0.13);
+            --radius-xl: 28px;
+            --radius-lg: 20px;
+            --radius-md: 14px;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            font-family: "Aptos", "Segoe UI", "Trebuchet MS", sans-serif;
+            color: var(--ink);
+            background:
+                radial-gradient(circle at top left, rgba(238, 155, 0, 0.21), transparent 24%),
+                radial-gradient(circle at top right, rgba(10, 147, 150, 0.18), transparent 22%),
+                linear-gradient(145deg, #f7f3ec 0%, #ebe0cf 100%);
+            padding: 30px 18px 48px;
+        }
+
+        .shell {
+            max-width: 1180px;
+            margin: 0 auto;
+        }
+
+        .hero {
+            display: grid;
+            grid-template-columns: 1.15fr 0.85fr;
+            gap: 24px;
+        }
+
+        .card,
+        .hero-card,
+        .stats-card,
+        .preview-card,
+        .table-card {
+            background: var(--paper);
+            border: 1px solid rgba(255, 255, 255, 0.45);
+            backdrop-filter: blur(18px);
+            box-shadow: var(--shadow);
+        }
+
+        .hero-card,
+        .card,
+        .preview-card,
+        .table-card {
+            border-radius: var(--radius-xl);
+        }
+
+        .hero-card {
+            padding: 34px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .hero-card::after {
+            content: "";
+            position: absolute;
+            width: 190px;
+            height: 190px;
+            border-radius: 50%;
+            right: -55px;
+            bottom: -65px;
+            background: radial-gradient(circle, rgba(0, 95, 115, 0.18), transparent 72%);
+        }
+
+        .eyebrow {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 12px;
+            border-radius: 999px;
+            background: var(--accent-soft);
+            color: var(--accent);
+            font-size: 13px;
+            font-weight: 700;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+        }
+
+        h1 {
+            margin: 18px 0 12px;
+            font-family: Georgia, "Times New Roman", serif;
+            font-size: clamp(2.2rem, 4vw, 4.2rem);
+            line-height: 0.97;
+            letter-spacing: -0.03em;
+        }
+
+        .hero-copy {
+            margin: 0;
+            max-width: 58ch;
+            color: var(--muted);
+            line-height: 1.65;
+            font-size: 1.03rem;
+        }
+
+        .hero-grid {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 14px;
+            margin-top: 26px;
+        }
+
+        .mini {
+            border-radius: var(--radius-md);
+            border: 1px solid rgba(29, 36, 48, 0.08);
+            background: rgba(255, 255, 255, 0.62);
+            padding: 14px 15px;
+        }
+
+        .mini strong {
+            display: block;
+            margin-bottom: 6px;
+        }
+
+        .mini span {
+            display: block;
+            color: var(--muted);
+            line-height: 1.45;
+            font-size: 0.93rem;
+        }
+
+        .stack {
+            display: grid;
+            gap: 20px;
+        }
+
+        .card {
+            padding: 24px;
+        }
+
+        .card h2 {
+            margin: 0 0 6px;
+            font-size: 1.2rem;
+        }
+
+        .card p {
+            margin: 0;
+            color: var(--muted);
+            line-height: 1.55;
+        }
+
+        .form-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 14px;
+            margin-top: 18px;
+        }
+
+        .field {
+            display: grid;
+            gap: 7px;
+        }
+
+        .field.field-full {
+            grid-column: 1 / -1;
+        }
+
+        label {
+            font-size: 0.92rem;
+            font-weight: 700;
+        }
+
+        input {
+            width: 100%;
+            border: 1px solid rgba(29, 36, 48, 0.12);
+            border-radius: 14px;
+            padding: 13px 14px;
+            font: inherit;
+            background: rgba(255, 255, 255, 0.84);
+            color: var(--ink);
+        }
+
+        .dropzone {
+            position: relative;
+            display: grid;
+            gap: 8px;
+            padding: 24px;
+            border-radius: 24px;
+            border: 2px dashed rgba(0, 95, 115, 0.28);
+            background: linear-gradient(180deg, rgba(255, 255, 255, 0.82), rgba(242, 248, 248, 0.9));
+            text-align: center;
+            margin-top: 18px;
+            transition: border-color 160ms ease, transform 160ms ease;
+        }
+
+        .dropzone.dragover {
+            border-color: var(--accent-strong);
+            transform: translateY(-1px);
+        }
+
+        .dropzone h3 {
+            margin: 0;
+            font-size: 1.2rem;
+        }
+
+        .dropzone p {
+            margin: 0;
+        }
+
+        .file-input {
+            position: absolute;
+            inset: 0;
+            opacity: 0;
+            cursor: pointer;
+        }
+
+        .actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            margin-top: 18px;
+        }
+
+        button {
+            appearance: none;
+            border: 0;
+            border-radius: 999px;
+            padding: 14px 20px;
+            font: inherit;
+            font-weight: 700;
+            cursor: pointer;
+            transition: transform 160ms ease, box-shadow 160ms ease, opacity 160ms ease;
+        }
+
+        button:hover:not(:disabled) {
+            transform: translateY(-1px);
+        }
+
+        button:disabled {
+            opacity: 0.45;
+            cursor: not-allowed;
+        }
+
+        .primary {
+            background: linear-gradient(135deg, var(--accent), var(--accent-strong));
+            color: white;
+            box-shadow: 0 16px 28px rgba(0, 95, 115, 0.22);
+        }
+
+        .secondary {
+            background: rgba(255, 255, 255, 0.82);
+            color: var(--ink);
+            border: 1px solid rgba(29, 36, 48, 0.11);
+        }
+
+        .warn {
+            background: linear-gradient(135deg, #cc7a00, #ee9b00);
+            color: white;
+            box-shadow: 0 16px 28px rgba(238, 155, 0, 0.22);
+        }
+
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            border-radius: 999px;
+            padding: 8px 12px;
+            font-size: 0.9rem;
+            font-weight: 700;
+        }
+
+        .badge.ok {
+            background: rgba(43, 122, 67, 0.12);
+            color: var(--success);
+        }
+
+        .badge.pending {
+            background: rgba(0, 95, 115, 0.12);
+            color: var(--accent);
+        }
+
+        .meta-box {
+            margin-top: 16px;
+            border-radius: var(--radius-md);
+            background: rgba(255, 255, 255, 0.72);
+            border: 1px solid var(--line);
+            padding: 14px 16px;
+        }
+
+        .meta-box strong {
+            display: block;
+            margin-bottom: 4px;
+        }
+
+        .meta-box span {
+            color: var(--muted);
+            font-size: 0.94rem;
+        }
+
+        .status {
+            min-height: 24px;
+            margin-top: 12px;
+            font-size: 0.95rem;
+            font-weight: 700;
+        }
+
+        .status.ok {
+            color: var(--success);
+        }
+
+        .status.error {
+            color: var(--danger);
+        }
+
+        .status.info {
+            color: var(--accent);
+        }
+
+        .section {
+            margin-top: 26px;
+            display: grid;
+            gap: 20px;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 16px;
+        }
+
+        .stats-card {
+            border-radius: var(--radius-lg);
+            padding: 18px;
+        }
+
+        .stats-card strong {
+            display: block;
+            font-size: 2rem;
+            line-height: 1;
+            margin-bottom: 8px;
+            font-family: Georgia, "Times New Roman", serif;
+            color: var(--accent);
+        }
+
+        .stats-card span {
+            display: block;
+            color: var(--muted);
+            line-height: 1.45;
+        }
+
+        .preview-card,
+        .table-card {
+            overflow: hidden;
+        }
+
+        .preview-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+            padding: 20px 22px 12px;
+        }
+
+        .preview-top h3 {
+            margin: 0;
+            font-size: 1.18rem;
+        }
+
+        .preview-top p {
+            margin: 5px 0 0;
+            color: var(--muted);
+        }
+
+        .table-wrap {
+            overflow: auto;
+            border-top: 1px solid var(--line);
+        }
+
+        table {
+            width: 100%;
+            min-width: 880px;
+            border-collapse: collapse;
+            background: rgba(255, 255, 255, 0.56);
+        }
+
+        th,
+        td {
+            text-align: left;
+            padding: 13px 16px;
+            border-bottom: 1px solid rgba(29, 36, 48, 0.08);
+            vertical-align: top;
+        }
+
+        th {
+            position: sticky;
+            top: 0;
+            z-index: 1;
+            background: rgba(244, 249, 248, 0.98);
+            color: var(--accent);
+            font-size: 0.84rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        td {
+            line-height: 1.45;
+            font-size: 0.95rem;
+        }
+
+        .warning-list {
+            display: grid;
+            gap: 10px;
+            margin-top: 12px;
+        }
+
+        .warning {
+            border-radius: var(--radius-md);
+            background: rgba(238, 155, 0, 0.11);
+            border: 1px solid rgba(238, 155, 0, 0.18);
+            padding: 12px 14px;
+            color: #7a5200;
+            line-height: 1.5;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        @media (max-width: 980px) {
+            .hero {
+                grid-template-columns: 1fr;
+            }
+
+            .hero-grid,
+            .form-grid,
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="shell">
+        <section class="hero">
+            <article class="hero-card">
+                <span class="eyebrow">Local Shopify Sync</span>
+                <h1>Upload Odoo CSV. Connect Shopify. Create missing orders and update existing ones.</h1>
+                <p class="hero-copy">
+                    This local app keeps your Admin API token on your machine, prepares the CSV for Matrixify, and can also push orders directly into Shopify. Existing orders are updated with Shopify's safe order update fields instead of creating duplicates.
+                </p>
+                <div class="hero-grid">
+                    <div class="mini">
+                        <strong>Local token handling</strong>
+                        <span>The access token is sent only to the localhost app, not to a hosted website.</span>
+                    </div>
+                    <div class="mini">
+                        <strong>Create or update</strong>
+                        <span>Missing orders are created. Existing orders are updated with note, phone, and custom attributes.</span>
+                    </div>
+                    <div class="mini">
+                        <strong>Matrixify still included</strong>
+                        <span>You can still download <code>Orders.csv</code> and the mapping report from the same page.</span>
+                    </div>
+                </div>
+            </article>
+
+            <div class="stack">
+                <section class="card">
+                    <h2>Connect Shopify</h2>
+                    <p>Enter your custom app store domain, Admin API access token, and the timezone offset for Odoo order timestamps.</p>
+                    <div class="form-grid">
+                        <div class="field">
+                            <label for="shopDomain">Shopify domain</label>
+                            <input id="shopDomain" type="text" placeholder="your-store.myshopify.com">
+                        </div>
+                        <div class="field">
+                            <label for="timeZoneOffset">Order time offset</label>
+                            <input id="timeZoneOffset" type="text" value="+08:00" placeholder="Singapore time UTC+08:00">
+                        </div>
+                        <div class="field field-full">
+                            <label for="accessToken">Admin API access token</label>
+                            <input id="accessToken" type="password" placeholder="shpat_...">
+                        </div>
+                    </div>
+                    <div class="actions">
+                        <button class="primary" id="connectButton">Connect Store</button>
+                    </div>
+                    <div class="meta-box" id="shopMeta">
+                        <strong>Not connected yet</strong>
+                        <span>Use an offline custom app token with at least <code>read_orders</code> and <code>write_orders</code>. Older duplicate detection also needs <code>read_all_orders</code>.</span>
+                    </div>
+                    <div class="status" id="connectStatus"></div>
+                </section>
+
+                <section class="card">
+                    <h2>Prepare CSV</h2>
+                    <p>Choose the Odoo order export. You can preview it, download the Matrixify files, or send it directly to Shopify.</p>
+                    <label class="dropzone" id="dropzone">
+                        <input class="file-input" id="fileInput" type="file" accept=".csv,text/csv">
+                        <h3>Select or drop the Odoo CSV</h3>
+                        <p>The same converter rules from your current export are used here.</p>
+                    </label>
+                    <div class="meta-box" id="fileMeta">
+                        <strong>No file selected yet</strong>
+                        <span>Choose an Odoo order CSV to continue.</span>
+                    </div>
+                    <div class="actions">
+                        <button class="primary" id="previewButton" disabled>Preview and Prepare</button>
+                        <button class="secondary" id="downloadOrdersButton" disabled>Download Orders.csv</button>
+                        <button class="secondary" id="downloadMappingButton" disabled>Download Mapping CSV</button>
+                        <button class="warn" id="importButton" disabled>Import to Shopify</button>
+                    </div>
+                    <div class="status" id="fileStatus"></div>
+                </section>
+            </div>
+        </section>
+
+        <section class="section hidden" id="previewSection">
+            <div class="stats-grid" id="previewStats"></div>
+
+            <div class="preview-card">
+                <div class="preview-top">
+                    <div>
+                        <h3>Prepared order preview</h3>
+                        <p>The first five rows below are what the converter generated from the uploaded Odoo file.</p>
+                    </div>
+                    <span class="badge pending" id="shopBadge">Not connected</span>
+                </div>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Processed At</th>
+                                <th>Line Title</th>
+                                <th>Line Price</th>
+                                <th>Phone</th>
+                                <th>Quantity Note</th>
+                            </tr>
+                        </thead>
+                        <tbody id="previewBody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <section class="section hidden" id="importSection">
+            <div class="stats-grid" id="jobStats"></div>
+
+            <div class="table-card">
+                <div class="preview-top">
+                    <div>
+                        <h3>Shopify import progress</h3>
+                        <p>Recent order results are shown here while the import is running.</p>
+                    </div>
+                    <div class="actions" style="margin-top:0">
+                        <button class="secondary" id="downloadResultsButton" disabled>Download Import Results CSV</button>
+                    </div>
+                </div>
+                <div class="warning-list hidden" id="jobWarnings"></div>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Order Reference</th>
+                                <th>Action</th>
+                                <th>Status</th>
+                                <th>Shopify Order</th>
+                                <th>Message</th>
+                            </tr>
+                        </thead>
+                        <tbody id="jobBody"></tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="status" id="jobStatus"></div>
+        </section>
+
+        <section class="section">
+            <div class="card">
+                <h2>Customer CSV Mapping</h2>
+                <p>Upload the Shopify customer template CSV and the Odoo <code>res.partner.csv</code>. This section only prepares a manual Shopify customer import CSV and does not call the Shopify API.</p>
+                <div class="form-grid">
+                    <div class="field field-full">
+                        <label class="dropzone" id="customerTemplateDropzone">
+                            <input class="file-input" id="customerTemplateInput" type="file" accept=".csv,text/csv">
+                            <h3>Select Shopify customer template CSV</h3>
+                            <p>Use the template exported or downloaded from Shopify so the output columns match exactly.</p>
+                        </label>
+                        <div class="meta-box" id="customerTemplateMeta">
+                            <strong>No Shopify template selected yet</strong>
+                            <span>Choose the Shopify customer template CSV first.</span>
+                        </div>
+                    </div>
+
+                    <div class="field field-full">
+                        <label class="dropzone" id="customerOdooDropzone">
+                            <input class="file-input" id="customerOdooInput" type="file" accept=".csv,text/csv">
+                            <h3>Select Odoo customer CSV</h3>
+                            <p>Upload the Odoo <code>res.partner.csv</code> file you want to convert.</p>
+                        </label>
+                        <div class="meta-box" id="customerOdooMeta">
+                            <strong>No Odoo customer file selected yet</strong>
+                            <span>Choose the Odoo customer CSV to map it to Shopify.</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="actions">
+                    <button class="primary" id="prepareCustomerButton" disabled>Prepare Customer CSV</button>
+                    <button class="secondary" id="downloadCustomerButton" disabled>Download Customer CSV</button>
+                    <button class="secondary" id="downloadCustomerMappingButton" disabled>Download Customer Mapping CSV</button>
+                </div>
+                <div class="status" id="customerStatus"></div>
+            </div>
+        </section>
+
+        <section class="section hidden" id="customerPreviewSection">
+            <div class="stats-grid" id="customerStats"></div>
+
+            <div class="preview-card">
+                <div class="preview-top">
+                    <div>
+                        <h3>Prepared Shopify customer preview</h3>
+                        <p>The first five mapped customer rows are shown here before you import them manually into Shopify.</p>
+                    </div>
+                </div>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>First Name</th>
+                                <th>Last Name</th>
+                                <th>Email</th>
+                                <th>Country Code</th>
+                                <th>Zip</th>
+                                <th>Note</th>
+                            </tr>
+                        </thead>
+                        <tbody id="customerPreviewBody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <script src="/odoo_matrixify_converter.js"></script>
+    <script>
+        (function () {
+            "use strict";
+
+            var converter = window.OdooMatrixifyConverter;
+            var shopDomainInput = document.getElementById("shopDomain");
+            var accessTokenInput = document.getElementById("accessToken");
+            var timeZoneOffsetInput = document.getElementById("timeZoneOffset");
+            var connectButton = document.getElementById("connectButton");
+            var shopMeta = document.getElementById("shopMeta");
+            var connectStatus = document.getElementById("connectStatus");
+            var fileInput = document.getElementById("fileInput");
+            var dropzone = document.getElementById("dropzone");
+            var fileMeta = document.getElementById("fileMeta");
+            var previewButton = document.getElementById("previewButton");
+            var downloadOrdersButton = document.getElementById("downloadOrdersButton");
+            var downloadMappingButton = document.getElementById("downloadMappingButton");
+            var importButton = document.getElementById("importButton");
+            var fileStatus = document.getElementById("fileStatus");
+            var previewSection = document.getElementById("previewSection");
+            var previewStats = document.getElementById("previewStats");
+            var previewBody = document.getElementById("previewBody");
+            var shopBadge = document.getElementById("shopBadge");
+            var importSection = document.getElementById("importSection");
+            var jobStats = document.getElementById("jobStats");
+            var jobBody = document.getElementById("jobBody");
+            var jobWarnings = document.getElementById("jobWarnings");
+            var jobStatus = document.getElementById("jobStatus");
+            var downloadResultsButton = document.getElementById("downloadResultsButton");
+            var customerTemplateInput = document.getElementById("customerTemplateInput");
+            var customerOdooInput = document.getElementById("customerOdooInput");
+            var customerTemplateDropzone = document.getElementById("customerTemplateDropzone");
+            var customerOdooDropzone = document.getElementById("customerOdooDropzone");
+            var customerTemplateMeta = document.getElementById("customerTemplateMeta");
+            var customerOdooMeta = document.getElementById("customerOdooMeta");
+            var prepareCustomerButton = document.getElementById("prepareCustomerButton");
+            var downloadCustomerButton = document.getElementById("downloadCustomerButton");
+            var downloadCustomerMappingButton = document.getElementById("downloadCustomerMappingButton");
+            var customerStatus = document.getElementById("customerStatus");
+            var customerPreviewSection = document.getElementById("customerPreviewSection");
+            var customerStats = document.getElementById("customerStats");
+            var customerPreviewBody = document.getElementById("customerPreviewBody");
+
+            var selectedFile = null;
+            var previewResult = null;
+            var connectedShop = null;
+            var currentJobId = "";
+            var currentPollHandle = 0;
+            var importInProgress = false;
+            var selectedCustomerTemplateFile = null;
+            var selectedCustomerOdooFile = null;
+            var customerResult = null;
+
+            function formatFileSize(bytes) {
+                if (!Number.isFinite(bytes)) {
+                    return "";
+                }
+                if (bytes < 1024) {
+                    return bytes + " B";
+                }
+                if (bytes < 1024 * 1024) {
+                    return (bytes / 1024).toFixed(1) + " KB";
+                }
+                return (bytes / (1024 * 1024)).toFixed(2) + " MB";
+            }
+
+            function setStatus(element, message, type) {
+                element.textContent = message || "";
+                element.className = "status" + (type ? " " + type : "");
+            }
+
+            function setHidden(element, hidden) {
+                element.classList.toggle("hidden", !!hidden);
+            }
+
+            function downloadText(fileName, text) {
+                var blob = new Blob([text], { type: "text/csv;charset=utf-8" });
+                var url = URL.createObjectURL(blob);
+                var link = document.createElement("a");
+                link.href = url;
+                link.download = fileName;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                setTimeout(function () {
+                    URL.revokeObjectURL(url);
+                }, 1000);
+            }
+
+            async function postJson(url, payload) {
+                var response;
+                var data;
+
+                try {
+                    response = await fetch(url, {
+                        method: "POST",
+                        headers: {
+                            "Content-Type": "application/json"
+                        },
+                        body: JSON.stringify(payload)
+                    });
+                } catch (error) {
+                    throw new Error("Cannot reach the local sync server. Open the app from Open_Odoo_CSV_Converter.bat and make sure the browser URL is http://127.0.0.1:3456.");
+                }
+
+                try {
+                    data = await response.json();
+                } catch (error) {
+                    throw new Error("The local sync server returned an invalid response.");
+                }
+
+                if (!response.ok || !data.ok) {
+                    throw new Error(data && data.error ? data.error : "Request failed.");
+                }
+                return data;
+            }
+
+            async function getJson(url) {
+                var response;
+                var data;
+
+                try {
+                    response = await fetch(url);
+                } catch (error) {
+                    throw new Error("Cannot reach the local sync server. Open the app from Open_Odoo_CSV_Converter.bat and make sure the browser URL is http://127.0.0.1:3456.");
+                }
+
+                try {
+                    data = await response.json();
+                } catch (error) {
+                    throw new Error("The local sync server returned an invalid response.");
+                }
+
+                if (!response.ok || !data.ok) {
+                    throw new Error(data && data.error ? data.error : "Request failed.");
+                }
+                return data;
+            }
+
+            function refreshActionStates() {
+                previewButton.disabled = !selectedFile;
+                downloadOrdersButton.disabled = !previewResult;
+                downloadMappingButton.disabled = !previewResult;
+                importButton.disabled = importInProgress || !(selectedFile && previewResult && connectedShop);
+            }
+
+            function refreshCustomerActionStates() {
+                prepareCustomerButton.disabled = !(selectedCustomerTemplateFile && selectedCustomerOdooFile);
+                downloadCustomerButton.disabled = !customerResult;
+                downloadCustomerMappingButton.disabled = !customerResult;
+            }
+
+            function renderConnection() {
+                if (!connectedShop) {
+                    shopMeta.innerHTML = "<strong>Not connected yet</strong><span>Use an offline custom app token with at least <code>read_orders</code> and <code>write_orders</code>. Older duplicate detection also needs <code>read_all_orders</code>.</span>";
+                    shopBadge.textContent = "Not connected";
+                    shopBadge.className = "badge pending";
+                    refreshActionStates();
+                    return;
+                }
+
+                shopMeta.innerHTML =
+                    "<strong>" + connectedShop.shop.name + "</strong>" +
+                    "<span>" + connectedShop.shop.myshopifyDomain + " · shop currency " + connectedShop.shop.currencyCode + "</span>";
+                shopBadge.textContent = "Connected to " + connectedShop.shop.myshopifyDomain;
+                shopBadge.className = "badge ok";
+                refreshActionStates();
+            }
+
+            function updateFileMeta() {
+                if (!selectedFile) {
+                    fileMeta.innerHTML = "<strong>No file selected yet</strong><span>Choose an Odoo order CSV to continue.</span>";
+                    return;
+                }
+
+                fileMeta.innerHTML =
+                    "<strong>" + selectedFile.name + "</strong>" +
+                    "<span>" + formatFileSize(selectedFile.size) + " · ready for preview and import</span>";
+            }
+
+            function updateCustomerFileMeta(element, file, emptyTitle, emptyText, readyText) {
+                if (!file) {
+                    element.innerHTML = "<strong>" + emptyTitle + "</strong><span>" + emptyText + "</span>";
+                    return;
+                }
+
+                element.innerHTML =
+                    "<strong>" + file.name + "</strong>" +
+                    "<span>" + formatFileSize(file.size) + " · " + readyText + "</span>";
+            }
+
+            function renderStats(container, items) {
+                container.innerHTML = "";
+                items.forEach(function (item) {
+                    var card = document.createElement("div");
+                    card.className = "stats-card";
+                    card.innerHTML = "<strong>" + item.value + "</strong><span>" + item.label + "</span>";
+                    container.appendChild(card);
+                });
+            }
+
+            function renderPreview() {
+                if (!previewResult) {
+                    setHidden(previewSection, true);
+                    return;
+                }
+
+                renderStats(previewStats, [
+                    { label: "Orders parsed", value: previewResult.stats.ordersParsed },
+                    { label: "Output rows", value: previewResult.stats.matrixifyRowsWritten },
+                    { label: "Phones normalized", value: previewResult.stats.ordersWithNormalizedPhone },
+                    { label: "Quantity assumptions", value: previewResult.stats.ordersWithQuantityAssumptions }
+                ]);
+
+                previewBody.innerHTML = "";
+                previewResult.matrixifyRows.slice(0, 5).forEach(function (row) {
+                    var tr = document.createElement("tr");
+                    [
+                        row["Name"],
+                        row["Processed At"],
+                        row["Line: Title"],
+                        row["Line: Price"],
+                        row["Phone"],
+                        row["Derived Quantity Note"]
+                    ].forEach(function (value) {
+                        var td = document.createElement("td");
+                        td.textContent = value || "";
+                        tr.appendChild(td);
+                    });
+                    previewBody.appendChild(tr);
+                });
+
+                setHidden(previewSection, false);
+            }
+
+            function renderCustomerPreview() {
+                if (!customerResult) {
+                    setHidden(customerPreviewSection, true);
+                    return;
+                }
+
+                renderStats(customerStats, [
+                    { label: "Template columns", value: customerResult.stats.templateColumns },
+                    { label: "Odoo columns", value: customerResult.stats.odooColumns },
+                    { label: "Customers parsed", value: customerResult.stats.customersParsed },
+                    { label: "Customers with email", value: customerResult.stats.customersWithEmail }
+                ]);
+
+                customerPreviewBody.innerHTML = "";
+                customerResult.customerRows.slice(0, 5).forEach(function (row) {
+                    var tr = document.createElement("tr");
+                    [
+                        row["First Name"],
+                        row["Last Name"],
+                        row["Email"],
+                        row["Default Address Country Code"],
+                        row["Default Address Zip"],
+                        row["Note"]
+                    ].forEach(function (value) {
+                        var td = document.createElement("td");
+                        td.textContent = value || "";
+                        tr.appendChild(td);
+                    });
+                    customerPreviewBody.appendChild(tr);
+                });
+
+                setHidden(customerPreviewSection, false);
+            }
+
+            function renderJob(job) {
+                setHidden(importSection, false);
+
+                renderStats(jobStats, [
+                    { label: "Total orders", value: job.summary.totalOrders },
+                    { label: "Processed", value: job.summary.processedOrders },
+                    { label: "Created", value: job.summary.createdOrders },
+                    { label: "Updated", value: job.summary.updatedOrders }
+                ]);
+
+                jobBody.innerHTML = "";
+                job.recentResults.forEach(function (result) {
+                    var tr = document.createElement("tr");
+                    [
+                        result.orderReference,
+                        result.action,
+                        result.status,
+                        result.shopifyOrderName || result.shopifyOrderId || "",
+                        result.message
+                    ].forEach(function (value) {
+                        var td = document.createElement("td");
+                        td.textContent = value || "";
+                        tr.appendChild(td);
+                    });
+                    jobBody.appendChild(tr);
+                });
+
+                jobWarnings.innerHTML = "";
+                if (job.warnings && job.warnings.length) {
+                    job.warnings.forEach(function (warningText) {
+                        var warning = document.createElement("div");
+                        warning.className = "warning";
+                        warning.textContent = warningText;
+                        jobWarnings.appendChild(warning);
+                    });
+                    setHidden(jobWarnings, false);
+                } else {
+                    setHidden(jobWarnings, true);
+                }
+
+                downloadResultsButton.disabled = !job.id;
+
+                if (job.status === "running" || job.status === "queued") {
+                    importInProgress = true;
+                    refreshActionStates();
+                    setStatus(jobStatus, "Import is running. Existing Shopify orders are updated only with note, phone, and custom attributes.", "info");
+                } else if (job.status === "completed") {
+                    importInProgress = false;
+                    refreshActionStates();
+                    setStatus(jobStatus, "Import completed. You can download the result CSV for a full order-by-order report.", "ok");
+                } else if (job.status === "failed") {
+                    importInProgress = false;
+                    refreshActionStates();
+                    setStatus(jobStatus, job.error || "Import failed.", "error");
+                }
+            }
+
+            function stopPolling() {
+                if (currentPollHandle) {
+                    window.clearTimeout(currentPollHandle);
+                    currentPollHandle = 0;
+                }
+            }
+
+            async function pollJob(jobId) {
+                try {
+                    var response = await getJson("/api/jobs/" + encodeURIComponent(jobId));
+                    renderJob(response.job);
+
+                    if (response.job.status === "running" || response.job.status === "queued") {
+                        currentPollHandle = window.setTimeout(function () {
+                            pollJob(jobId);
+                        }, 1500);
+                    } else {
+                        stopPolling();
+                    }
+                } catch (error) {
+                    setStatus(jobStatus, error.message, "error");
+                    stopPolling();
+                }
+            }
+
+            function setSelectedFile(file) {
+                selectedFile = file || null;
+                previewResult = null;
+                setHidden(previewSection, true);
+                updateFileMeta();
+                refreshActionStates();
+                setStatus(fileStatus, selectedFile ? "CSV selected. Preview it before importing." : "", selectedFile ? "info" : "");
+            }
+
+            function setSelectedCustomerTemplateFile(file) {
+                selectedCustomerTemplateFile = file || null;
+                customerResult = null;
+                renderCustomerPreview();
+                updateCustomerFileMeta(
+                    customerTemplateMeta,
+                    selectedCustomerTemplateFile,
+                    "No Shopify template selected yet",
+                    "Choose the Shopify customer template CSV first.",
+                    "Shopify template ready"
+                );
+                refreshCustomerActionStates();
+                setStatus(customerStatus, selectedCustomerTemplateFile ? "Shopify customer template selected." : "", selectedCustomerTemplateFile ? "info" : "");
+            }
+
+            function setSelectedCustomerOdooFile(file) {
+                selectedCustomerOdooFile = file || null;
+                customerResult = null;
+                renderCustomerPreview();
+                updateCustomerFileMeta(
+                    customerOdooMeta,
+                    selectedCustomerOdooFile,
+                    "No Odoo customer file selected yet",
+                    "Choose the Odoo customer CSV to map it to Shopify.",
+                    "Odoo customer file ready"
+                );
+                refreshCustomerActionStates();
+                setStatus(customerStatus, selectedCustomerOdooFile ? "Odoo customer CSV selected." : "", selectedCustomerOdooFile ? "info" : "");
+            }
+
+            async function connectStore() {
+                connectButton.disabled = true;
+                setStatus(connectStatus, "Connecting to Shopify...", "info");
+
+                try {
+                    var payload = {
+                        shopDomain: shopDomainInput.value,
+                        accessToken: accessTokenInput.value
+                    };
+                    var response = await postJson("/api/connect", payload);
+                    connectedShop = response;
+                    renderConnection();
+                    setStatus(connectStatus, "Connected successfully.", "ok");
+                } catch (error) {
+                    connectedShop = null;
+                    renderConnection();
+                    setStatus(connectStatus, error.message, "error");
+                } finally {
+                    connectButton.disabled = false;
+                }
+            }
+
+            async function previewCsv() {
+                if (!selectedFile) {
+                    return;
+                }
+
+                previewButton.disabled = true;
+                setStatus(fileStatus, "Preparing Matrixify and Shopify import preview...", "info");
+
+                try {
+                    var csvText = await selectedFile.text();
+                    previewResult = converter.convertCsvText(csvText, {
+                        ordersFileName: "Orders.csv",
+                        mappingFileName: "odoo_to_matrixify_column_mapping.csv"
+                    });
+                    renderPreview();
+                    refreshActionStates();
+                    setStatus(fileStatus, "Preview is ready. You can download the CSVs or import directly into Shopify.", "ok");
+                } catch (error) {
+                    previewResult = null;
+                    renderPreview();
+                    refreshActionStates();
+                    setStatus(fileStatus, error && error.message ? error.message : "Preview failed.", "error");
+                } finally {
+                    previewButton.disabled = !selectedFile;
+                }
+            }
+
+            async function startImport() {
+                if (!selectedFile || !previewResult || !connectedShop) {
+                    return;
+                }
+
+                importButton.disabled = true;
+                importInProgress = true;
+                setStatus(jobStatus, "Starting Shopify import job...", "info");
+
+                try {
+                    var csvText = await selectedFile.text();
+                    var response = await postJson("/api/import/start", {
+                        shopDomain: shopDomainInput.value,
+                        accessToken: accessTokenInput.value,
+                        timeZoneOffset: (timeZoneOffsetInput.value || "").trim() || "+08:00",
+                        csvText: csvText
+                    });
+
+                    currentJobId = response.job.id;
+                    renderJob(response.job);
+                    stopPolling();
+                    pollJob(currentJobId);
+                } catch (error) {
+                    importInProgress = false;
+                    setStatus(jobStatus, error.message, "error");
+                } finally {
+                    refreshActionStates();
+                }
+            }
+
+            function fileNameWithoutExtension(fileName) {
+                return String(fileName || "").replace(/\.[^.]+$/, "") || "customers";
+            }
+
+            async function prepareCustomerCsv() {
+                if (!(selectedCustomerTemplateFile && selectedCustomerOdooFile)) {
+                    return;
+                }
+
+                prepareCustomerButton.disabled = true;
+                setStatus(customerStatus, "Preparing Shopify customer CSV...", "info");
+
+                try {
+                    var templateText = await selectedCustomerTemplateFile.text();
+                    var odooText = await selectedCustomerOdooFile.text();
+                    var baseName = fileNameWithoutExtension(selectedCustomerOdooFile.name);
+
+                    customerResult = converter.convertCustomerCsvTexts(templateText, odooText, {
+                        customerFileName: baseName + ".shopify.customers.csv",
+                        mappingFileName: baseName + ".shopify.customer.mapping.csv"
+                    });
+
+                    renderCustomerPreview();
+                    refreshCustomerActionStates();
+                    setStatus(customerStatus, "Customer CSV is ready. Download it and import it manually into Shopify customers.", "ok");
+                } catch (error) {
+                    customerResult = null;
+                    renderCustomerPreview();
+                    refreshCustomerActionStates();
+                    setStatus(customerStatus, error && error.message ? error.message : "Customer conversion failed.", "error");
+                } finally {
+                    prepareCustomerButton.disabled = !(selectedCustomerTemplateFile && selectedCustomerOdooFile);
+                }
+            }
+
+            connectButton.addEventListener("click", function () {
+                connectStore();
+            });
+
+            fileInput.addEventListener("change", function (event) {
+                var file = event.target.files && event.target.files[0] ? event.target.files[0] : null;
+                setSelectedFile(file);
+            });
+
+            customerTemplateInput.addEventListener("change", function (event) {
+                var file = event.target.files && event.target.files[0] ? event.target.files[0] : null;
+                setSelectedCustomerTemplateFile(file);
+            });
+
+            customerOdooInput.addEventListener("change", function (event) {
+                var file = event.target.files && event.target.files[0] ? event.target.files[0] : null;
+                setSelectedCustomerOdooFile(file);
+            });
+
+            ["dragenter", "dragover"].forEach(function (eventName) {
+                dropzone.addEventListener(eventName, function (event) {
+                    event.preventDefault();
+                    dropzone.classList.add("dragover");
+                });
+            });
+
+            ["dragleave", "drop"].forEach(function (eventName) {
+                dropzone.addEventListener(eventName, function (event) {
+                    event.preventDefault();
+                    dropzone.classList.remove("dragover");
+                });
+            });
+
+            dropzone.addEventListener("drop", function (event) {
+                var file = event.dataTransfer && event.dataTransfer.files && event.dataTransfer.files[0]
+                    ? event.dataTransfer.files[0]
+                    : null;
+                setSelectedFile(file);
+            });
+
+            ["dragenter", "dragover"].forEach(function (eventName) {
+                customerTemplateDropzone.addEventListener(eventName, function (event) {
+                    event.preventDefault();
+                    customerTemplateDropzone.classList.add("dragover");
+                });
+
+                customerOdooDropzone.addEventListener(eventName, function (event) {
+                    event.preventDefault();
+                    customerOdooDropzone.classList.add("dragover");
+                });
+            });
+
+            ["dragleave", "drop"].forEach(function (eventName) {
+                customerTemplateDropzone.addEventListener(eventName, function (event) {
+                    event.preventDefault();
+                    customerTemplateDropzone.classList.remove("dragover");
+                });
+
+                customerOdooDropzone.addEventListener(eventName, function (event) {
+                    event.preventDefault();
+                    customerOdooDropzone.classList.remove("dragover");
+                });
+            });
+
+            customerTemplateDropzone.addEventListener("drop", function (event) {
+                var file = event.dataTransfer && event.dataTransfer.files && event.dataTransfer.files[0]
+                    ? event.dataTransfer.files[0]
+                    : null;
+                setSelectedCustomerTemplateFile(file);
+            });
+
+            customerOdooDropzone.addEventListener("drop", function (event) {
+                var file = event.dataTransfer && event.dataTransfer.files && event.dataTransfer.files[0]
+                    ? event.dataTransfer.files[0]
+                    : null;
+                setSelectedCustomerOdooFile(file);
+            });
+
+            previewButton.addEventListener("click", function () {
+                previewCsv();
+            });
+
+            downloadOrdersButton.addEventListener("click", function () {
+                if (!previewResult) {
+                    return;
+                }
+                downloadText(previewResult.ordersFileName, previewResult.matrixifyCsvText);
+            });
+
+            downloadMappingButton.addEventListener("click", function () {
+                if (!previewResult) {
+                    return;
+                }
+                downloadText(previewResult.mappingFileName, previewResult.mappingCsvText);
+            });
+
+            importButton.addEventListener("click", function () {
+                startImport();
+            });
+
+            prepareCustomerButton.addEventListener("click", function () {
+                prepareCustomerCsv();
+            });
+
+            downloadCustomerButton.addEventListener("click", function () {
+                if (!customerResult) {
+                    return;
+                }
+                downloadText(customerResult.customerFileName, customerResult.customerCsvText);
+            });
+
+            downloadCustomerMappingButton.addEventListener("click", function () {
+                if (!customerResult) {
+                    return;
+                }
+                downloadText(customerResult.mappingFileName, customerResult.mappingCsvText);
+            });
+
+            downloadResultsButton.addEventListener("click", function () {
+                if (!currentJobId) {
+                    return;
+                }
+                window.location.href = "/api/jobs/" + encodeURIComponent(currentJobId) + "/results.csv";
+            });
+
+            renderConnection();
+            updateFileMeta();
+            refreshActionStates();
+            refreshCustomerActionStates();
+        }());
+    </script>
+</body>
+</html>

@@ -1,0 +1,12 @@
+Source Column,Shopify Column / Handling,Action,Notes
+Display Name,"First Name, Last Name, Note",Derived,Split into first and last name using the last word as the last name; original display name is preserved in the note.
+Phone,"Phone, Default Address Phone",Renamed + Normalized,Phone is normalized where possible and copied to both customer and default address phone.
+Email,Email,Renamed,Copied directly to Shopify customer email.
+Activities,Note,Copied to note,Preserved inside the customer note because there is no direct Shopify customer template column for Odoo activities.
+City,Default Address City,Renamed,"If Odoo city is blank and country is Singapore, the city defaults to Singapore."
+Country,Default Address Country Code,Derived,Converted from country name to a Shopify country code when recognized.
+Company,Default Address Company,Renamed,Copied directly into the Shopify default address company field.
+Complete Address,"Default Address Address1, Default Address Address2",Derived,Split into address lines after removing duplicated zip and country lines.
+Created on,Note,Copied to note,Preserved in the note for audit history.
+Currency,Note,Copied to note,Preserved in the note because the Shopify customer template has no direct currency column.
+Zip,Default Address Zip,Renamed,Copied directly to the Shopify default address zip field.

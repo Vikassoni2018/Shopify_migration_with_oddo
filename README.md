@@ -1,35 +1,33 @@
 # Shopify_migration_with_oddo
 
-This project contains a small Node.js web app for converting Odoo CSV data for Shopify/Matrixify and syncing orders.
+## Stripe-gated migration flow
 
-## Run locally
+The API now supports a Stripe-driven paid migration entitlement model:
 
-```bash
-npm install
-npm start
-```
+- Free tier: first `10` orders can be imported with no payment.
+- Paid tier A: `$10 / 1,000 orders` (tracked as paid quota).
+- Paid tier B: `$100` full migration unlock.
 
-Then open `http://localhost:3456`.
+### Endpoints
 
-## Deploy to Render
+- `POST /api/payments/quote`
+  - Input: `{ "totalOrders": number }`
+  - Returns free/paid breakdown and per-1,000 quote.
 
-This repo is now configured for Render using `render.yaml`.
+- `POST /api/payments/webhook`
+  - Accepts Stripe-style webhook payloads for:
+    - `checkout.session.completed`
+    - `payment_intent.succeeded`
+  - Uses event metadata:
+    - `shopDomain`
+    - `plan` (`per_1000` or `full`)
+  - Grants entitlement and logs transaction IDs.
 
-### Option A: Blueprint (recommended)
-1. Push this repository to GitHub.
-2. In Render, click **New +** → **Blueprint**.
-3. Select this repository.
-4. Render will detect `render.yaml` and create the web service.
-5. After deploy finishes, open your Render URL to view the app live.
+- `POST /api/import/start`
+  - Requires `selectedPlan` when total orders exceed the free limit (`per_1000` or `full`).
+  - Enforces paid quota or full-migration unlock before running import.
 
-### Option B: Manual Web Service
-1. In Render, create a **Web Service** from this repo.
-2. Use:
-   - **Build Command**: `npm install`
-   - **Start Command**: `npm start`
-   - **Runtime**: Node
-3. Deploy and open the generated Render URL.
+### Security notes
 
-## Notes
-- The server listens on `process.env.PORT` (Render sets this automatically).
-- Host binding is `0.0.0.0`, required for Render.
+- Card data collection must occur in Stripe Checkout or Stripe Elements only.
+- Payment confirmation must be validated server-side via webhooks.

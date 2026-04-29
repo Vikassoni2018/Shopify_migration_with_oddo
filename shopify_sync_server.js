@@ -8,7 +8,11 @@ const PORT = Number(process.env.PORT || 3456);
 const API_VERSION = "2026-04";
 const HOST = process.env.HOST || "0.0.0.0";
 const MAX_JSON_BODY_BYTES = 100 * 1024 * 1024;
+const FREE_ORDER_LIMIT = 10;
+const PER_THOUSAND_PRICE_USD_CENTS = 1000;
+const FULL_MIGRATION_PRICE_USD_CENTS = 10000;
 const jobs = new Map();
+const entitlements = new Map();
 
 const SHOP_QUERY = `
 query AppShopInfo {
@@ -149,6 +153,42 @@ async function readJsonBody(request) {
     }
 
     return JSON.parse(body);
+}
+
+async function readRawBody(request) {
+    const chunks = [];
+    let totalBytes = 0;
+
+    for await (const chunk of request) {
+        totalBytes += chunk.length;
+        if (totalBytes > MAX_JSON_BODY_BYTES) {
+            throw new Error("Request body is too large.");
+        }
+        chunks.push(chunk);
+    }
+
+    return Buffer.concat(chunks);
+}
+
+function getShopEntitlement(shopDomain) {
+    const key = normalizeShopDomain(shopDomain);
+    return entitlements.get(key) || {
+        shopDomain: key,
+        paidOrderQuota: 0,
+        fullMigrationUnlocked: false,
+        transactions: []
+    };
+}
+
+function setShopEntitlement(shopDomain, entitlement) {
+    entitlements.set(normalizeShopDomain(shopDomain), entitlement);
+}
+
+function computeAdditionalPaidOrders(totalOrders) {
+    if (totalOrders <= FREE_ORDER_LIMIT) {
+        return 0;
+    }
+    return totalOrders - FREE_ORDER_LIMIT;
 }
 
 async function shopifyGraphql(shopDomain, accessToken, query, variables) {
@@ -715,8 +755,29 @@ async function handleApiRequest(request, response) {
             }
 
             const preview = buildApiImportOrders(payload.csvText, payload.timeZoneOffset);
+            const selectedPlan = String(payload.selectedPlan || "free").toLowerCase();
+            const shopDomain = normalizeShopDomain(payload.shopDomain);
+            const entitlement = getShopEntitlement(shopDomain);
+            const additionalPaidOrders = computeAdditionalPaidOrders(preview.apiOrders.length);
+
+            if (additionalPaidOrders > 0 && !entitlement.fullMigrationUnlocked) {
+                const remainingQuota = Math.max(0, entitlement.paidOrderQuota || 0);
+                if (selectedPlan !== "per_1000" && selectedPlan !== "full") {
+                    throw new Error("Payment required after 10 orders. Select plan per_1000 or full.");
+                }
+
+                if (selectedPlan === "per_1000" && remainingQuota < additionalPaidOrders) {
+                    throw new Error(`Payment required. Need quota for ${additionalPaidOrders} additional orders, but only ${remainingQuota} remaining.`);
+                }
+            }
+
             const job = createJob(preview.converted.stats);
             job.summary.totalOrders = preview.apiOrders.length;
+            job.payment = {
+                selectedPlan,
+                freeOrderLimit: FREE_ORDER_LIMIT,
+                additionalPaidOrders
+            };
             runImportJob(job, payload).catch((error) => {
                 job.status = "failed";
                 job.error = error.message;
@@ -732,6 +793,70 @@ async function handleApiRequest(request, response) {
                 ok: false,
                 error: error.message
             });
+        }
+        return;
+    }
+
+    if (request.method === "POST" && url.pathname === "/api/payments/quote") {
+        try {
+            const payload = await readJsonBody(request);
+            const totalOrders = Number.parseInt(String(payload.totalOrders || "0"), 10) || 0;
+            const additionalPaidOrders = computeAdditionalPaidOrders(totalOrders);
+            const blocks = Math.max(1, Math.ceil(additionalPaidOrders / 1000));
+            sendJson(response, 200, {
+                ok: true,
+                pricing: {
+                    freeTierLimit: FREE_ORDER_LIMIT,
+                    perThousandUsd: PER_THOUSAND_PRICE_USD_CENTS / 100,
+                    fullMigrationUsd: FULL_MIGRATION_PRICE_USD_CENTS / 100
+                },
+                quote: {
+                    totalOrders,
+                    freeOrders: Math.min(totalOrders, FREE_ORDER_LIMIT),
+                    additionalPaidOrders,
+                    perThousandBlocks: additionalPaidOrders ? blocks : 0,
+                    perThousandTotalUsd: additionalPaidOrders ? blocks * (PER_THOUSAND_PRICE_USD_CENTS / 100) : 0
+                }
+            });
+        } catch (error) {
+            sendJson(response, 400, { ok: false, error: error.message });
+        }
+        return;
+    }
+
+    if (request.method === "POST" && url.pathname === "/api/payments/webhook") {
+        try {
+            const rawBody = await readRawBody(request);
+            const event = JSON.parse(rawBody.toString("utf8"));
+            const eventType = String(event.type || "");
+            if (eventType !== "checkout.session.completed" && eventType !== "payment_intent.succeeded") {
+                sendJson(response, 200, { ok: true, ignored: true });
+                return;
+            }
+
+            const metadata = (event.data && event.data.object && event.data.object.metadata) || {};
+            const shopDomain = normalizeShopDomain(metadata.shopDomain);
+            const plan = String(metadata.plan || "").toLowerCase();
+            const transactionId = String((event.data && event.data.object && event.data.object.id) || event.id || "");
+            const entitlement = getShopEntitlement(shopDomain);
+
+            if (plan === "full") {
+                entitlement.fullMigrationUnlocked = true;
+            } else if (plan === "per_1000") {
+                entitlement.paidOrderQuota += 1000;
+            }
+
+            entitlement.transactions.push({
+                transactionId,
+                eventType,
+                plan,
+                grantedAt: new Date().toISOString()
+            });
+            setShopEntitlement(shopDomain, entitlement);
+
+            sendJson(response, 200, { ok: true, entitlement });
+        } catch (error) {
+            sendJson(response, 400, { ok: false, error: error.message });
         }
         return;
     }

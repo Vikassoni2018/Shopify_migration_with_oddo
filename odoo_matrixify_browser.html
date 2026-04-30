@@ -437,6 +437,9 @@
         .hidden {
             display: none;
         }
+        .tabs-nav { display:flex; gap:10px; margin:20px 0 8px; flex-wrap:wrap; }
+        .tab-btn { border:1px solid var(--line); background:#fff; color:var(--ink); }
+        .tab-btn.active { background:var(--accent); color:#fff; }
 
         @media (max-width: 980px) {
             .hero {
@@ -589,6 +592,11 @@
         </section>
 
         <section class="section">
+            <div class="tabs-nav" id="toolTabs">
+                <button class="tab-btn active" data-tab="ordersTab">Order Sync</button>
+                <button class="tab-btn" data-tab="wooProductTab">WooCommerce Product Migration</button>
+            </div>
+            <div id="ordersTab">
             <div class="card">
                 <h2>Customer CSV Mapping</h2>
                 <p>Upload the Shopify customer template CSV and the Odoo <code>res.partner.csv</code>. This section only prepares a manual Shopify customer import CSV and does not call the Shopify API.</p>
@@ -623,6 +631,45 @@
                     <button class="secondary" id="downloadCustomerMappingButton" disabled>Download Customer Mapping CSV</button>
                 </div>
                 <div class="status" id="customerStatus"></div>
+            </div>
+            </div>
+        </section>
+
+        <section class="section hidden" id="wooProductTab">
+            <div class="card">
+                <h2>WooCommerce Product CSV → Shopify Product CSV + Direct Shopify Upsert</h2>
+                <p>Two methods: (1) direct CSV conversion for Shopify import, (2) connect Shopify and push products directly (create/update by Handle).</p>
+                <div class="form-grid">
+                    <div class="field">
+                        <label for="wooShopDomain">Shopify domain</label>
+                        <input id="wooShopDomain" type="text" placeholder="your-store.myshopify.com">
+                    </div>
+                    <div class="field">
+                        <label for="wooAccessToken">Shopify Admin API token</label>
+                        <input id="wooAccessToken" type="password" placeholder="shpat_...">
+                    </div>
+                    <div class="field field-full">
+                        <label class="dropzone" id="wooDropzone">
+                            <input class="file-input" id="wooFileInput" type="file" accept=".csv,text/csv">
+                            <h3>Select WooCommerce Product CSV</h3>
+                            <p>Upload WooCommerce product export CSV. The app maps fields to Shopify product CSV fields and supports direct sync.</p>
+                        </label>
+                        <div class="meta-box" id="wooMeta"><strong>No WooCommerce file selected yet</strong><span>Choose WooCommerce products CSV.</span></div>
+                    </div>
+                </div>
+                <div class="actions">
+                    <button class="primary" id="prepareWooButton" disabled>Prepare Shopify Product CSV</button>
+                    <button class="secondary" id="downloadWooButton" disabled>Download Shopify Product CSV</button>
+                    <button class="warn" id="syncWooButton" disabled>Create / Update Products in Shopify</button>
+                </div>
+                <div class="status" id="wooStatus"></div>
+            </div>
+        </section>
+
+        <section class="section hidden" id="wooFieldTab">
+            <div class="preview-card">
+                <div class="preview-top"><div><h3>Field Coverage (WooCommerce + Shopify)</h3><p>Mapped fields used for conversion and direct sync.</p></div></div>
+                <div class="table-wrap"><table><thead><tr><th>WooCommerce Field</th><th>Shopify Field</th></tr></thead><tbody id="wooFieldBody"></tbody></table></div>
             </div>
         </section>
 
@@ -698,6 +745,17 @@
             var customerPreviewSection = document.getElementById("customerPreviewSection");
             var customerStats = document.getElementById("customerStats");
             var customerPreviewBody = document.getElementById("customerPreviewBody");
+            var toolTabs = document.getElementById("toolTabs");
+            var ordersTab = document.getElementById("ordersTab");
+            var wooProductTab = document.getElementById("wooProductTab");
+            var wooFileInput = document.getElementById("wooFileInput");
+            var wooDropzone = document.getElementById("wooDropzone");
+            var wooMeta = document.getElementById("wooMeta");
+            var prepareWooButton = document.getElementById("prepareWooButton");
+            var downloadWooButton = document.getElementById("downloadWooButton");
+            var syncWooButton = document.getElementById("syncWooButton");
+            var wooStatus = document.getElementById("wooStatus");
+            var wooFieldBody = document.getElementById("wooFieldBody");
 
             var selectedFile = null;
             var previewResult = null;
@@ -708,6 +766,12 @@
             var selectedCustomerTemplateFile = null;
             var selectedCustomerOdooFile = null;
             var customerResult = null;
+            var wooFile = null;
+            var wooCsvResult = "";
+            var wooRows = [];
+            var wooFieldPairs = [
+                ["ID","Variant SKU"],["Type","Type"],["SKU","Variant SKU"],["Name","Title"],["Published","Published"],["Is featured?","Tags"],["Visibility in catalog","Published"],["Short description","Body (HTML)"],["Description","Body (HTML)"],["Date sale price starts","Variant Compare At Price"],["Date sale price ends","Variant Compare At Price"],["Tax status","Variant Taxable"],["Tax class","Variant Tax Code"],["In stock?","Variant Inventory Qty"],["Stock","Variant Inventory Qty"],["Backorders allowed?","Variant Inventory Policy"],["Sold individually?","Variant Inventory Policy"],["Weight (lbs)","Variant Grams"],["Length (in)","Variant Requires Shipping"],["Width (in)","Variant Requires Shipping"],["Height (in)","Variant Requires Shipping"],["Allow customer reviews?","SEO Description"],["Purchase note","Tags"],["Sale price","Variant Price"],["Regular price","Variant Compare At Price"],["Categories","Tags"],["Tags","Tags"],["Shipping class","Variant Fulfillment Service"],["Images","Image Src"],["Download limit","Variant Taxable"],["Download expiry days","Variant Taxable"],["Parent","Handle"],["Grouped products","Handle"],["Upsells","Tags"],["Cross-sells","Tags"],["External URL","Variant Barcode"],["Button text","SEO Title"],["Position","Image Position"],["Attribute 1 name","Option1 Name"],["Attribute 1 value(s)","Option1 Value"],["Attribute 2 name","Option2 Name"],["Attribute 2 value(s)","Option2 Value"],["Attribute 3 name","Option3 Name"],["Attribute 3 value(s)","Option3 Value"],["Meta: _yoast_wpseo_title","SEO Title"],["Meta: _yoast_wpseo_metadesc","SEO Description"]
+            ];
 
             function formatFileSize(bytes) {
                 if (!Number.isFinite(bytes)) {
@@ -720,6 +784,27 @@
                     return (bytes / 1024).toFixed(1) + " KB";
                 }
                 return (bytes / (1024 * 1024)).toFixed(2) + " MB";
+            }
+            function parseCsv(text) {
+                var lines = String(text || "").split(/\r?\n/).filter(Boolean);
+                if (!lines.length) { return []; }
+                var headers = lines[0].split(",").map(function (h) { return h.replace(/^\"|\"$/g, "").trim(); });
+                return lines.slice(1).map(function (line) {
+                    var cols = line.split(",");
+                    var row = {};
+                    headers.forEach(function (h, i) { row[h] = (cols[i] || "").replace(/^\"|\"$/g, ""); });
+                    return row;
+                });
+            }
+            function prepareWooCsvText(rows) {
+                var headers = ["Handle","Title","Body (HTML)","Vendor","Type","Tags","Published","Option1 Name","Option1 Value","Option2 Name","Option2 Value","Option3 Name","Option3 Value","Variant SKU","Variant Grams","Variant Inventory Qty","Variant Inventory Policy","Variant Fulfillment Service","Variant Price","Variant Compare At Price","Variant Requires Shipping","Variant Taxable","Image Src","Image Position","SEO Title","SEO Description"];
+                var out = [headers.join(",")];
+                rows.forEach(function (r) {
+                    var handle = (r.Name || "product").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+                    var mapped = [handle,r.Name || "",(r.Description || r["Short description"] || "").replace(/\n/g, " "),r["Attribute 1 value(s)"] || "",r.Type || "","" + (r.Categories || "") + "," + (r.Tags || ""),(r.Published || "1"),r["Attribute 1 name"] || "Title",r["Attribute 1 value(s)"] || "Default Title",r["Attribute 2 name"] || "",r["Attribute 2 value(s)"] || "",r["Attribute 3 name"] || "",r["Attribute 3 value(s)"] || "",r.SKU || "",String(Math.round(parseFloat(r["Weight (lbs)"] || "0") * 453.592) || 0),r.Stock || "0",(r["Backorders allowed?"] === "1" ? "continue" : "deny"),"manual",r["Sale price"] || r["Regular price"] || "0",r["Regular price"] || "", "TRUE","TRUE",(r.Images || "").split(",")[0] || "","1",r["Meta: _yoast_wpseo_title"] || r.Name || "",r["Meta: _yoast_wpseo_metadesc"] || ""];
+                    out.push(mapped.map(function (x) { return "\"" + String(x || "").replace(/\"/g, "\"\"") + "\""; }).join(","));
+                });
+                return out.join("\n");
             }
 
             function setStatus(element, message, type) {
@@ -806,6 +891,18 @@
                 prepareCustomerButton.disabled = !(selectedCustomerTemplateFile && selectedCustomerOdooFile);
                 downloadCustomerButton.disabled = !customerResult;
                 downloadCustomerMappingButton.disabled = !customerResult;
+            }
+            function refreshWooStates() {
+                prepareWooButton.disabled = !wooFile;
+                downloadWooButton.disabled = !wooCsvResult;
+                syncWooButton.disabled = !(wooRows.length && document.getElementById("wooShopDomain").value && document.getElementById("wooAccessToken").value);
+            }
+            async function syncWooProducts() {
+                setStatus(wooStatus, "Syncing WooCommerce products to Shopify...", "info");
+                try {
+                    var response = await postJson("/api/products/sync", { shopDomain: document.getElementById("wooShopDomain").value, accessToken: document.getElementById("wooAccessToken").value, products: wooRows });
+                    setStatus(wooStatus, "Sync completed. Created: " + response.summary.created + ", Updated: " + response.summary.updated + ", Failed: " + response.summary.failed, "ok");
+                } catch (error) { setStatus(wooStatus, error.message, "error"); }
             }
 
             function renderConnection() {
@@ -1237,6 +1334,33 @@
                     : null;
                 setSelectedCustomerOdooFile(file);
             });
+            wooFileInput.addEventListener("change", function (event) {
+                wooFile = event.target.files && event.target.files[0] ? event.target.files[0] : null;
+                wooCsvResult = ""; wooRows = [];
+                wooMeta.innerHTML = wooFile ? ("<strong>" + wooFile.name + "</strong><span>" + formatFileSize(wooFile.size) + " · ready</span>") : "<strong>No WooCommerce file selected yet</strong><span>Choose WooCommerce products CSV.</span>";
+                refreshWooStates();
+            });
+            prepareWooButton.addEventListener("click", async function () {
+                if (!wooFile) { return; }
+                var text = await wooFile.text();
+                wooRows = parseCsv(text);
+                wooCsvResult = prepareWooCsvText(wooRows);
+                setStatus(wooStatus, "Shopify product CSV prepared.", "ok");
+                wooFieldBody.innerHTML = "";
+                wooFieldPairs.forEach(function (pair) { var tr = document.createElement("tr"); tr.innerHTML = "<td>" + pair[0] + "</td><td>" + pair[1] + "</td>"; wooFieldBody.appendChild(tr); });
+                setHidden(document.getElementById("wooFieldTab"), false);
+                refreshWooStates();
+            });
+            downloadWooButton.addEventListener("click", function () { if (wooCsvResult) { downloadText("woocommerce.shopify.products.csv", wooCsvResult); } });
+            syncWooButton.addEventListener("click", function () { syncWooProducts(); });
+            toolTabs.addEventListener("click", function (event) {
+                if (!event.target.matches(".tab-btn")) { return; }
+                var tab = event.target.getAttribute("data-tab");
+                Array.prototype.forEach.call(toolTabs.querySelectorAll(".tab-btn"), function (b) { b.classList.remove("active"); });
+                event.target.classList.add("active");
+                setHidden(ordersTab, tab !== "ordersTab");
+                setHidden(wooProductTab, tab !== "wooProductTab");
+            });
 
             previewButton.addEventListener("click", function () {
                 previewCsv();
@@ -1289,6 +1413,7 @@
             updateFileMeta();
             refreshActionStates();
             refreshCustomerActionStates();
+            refreshWooStates();
         }());
     </script>
 </body>

@@ -847,13 +847,36 @@
                 if (!base) {
                     return "";
                 }
-                return base.replace(/\/+$/, "");
+                if (!/^https?:\/\//i.test(base) && base.charAt(0) !== "/") {
+                    base = "https://" + base;
+                }
+                try {
+                    var parsed = new URL(base, window.location.origin);
+                    return parsed.origin;
+                } catch (error) {
+                    return base.replace(/\/+$/, "");
+                }
             }
 
-            function toApiUrl(path) {
+            function toApiUrl(path, baseOverride) {
                 var cleanPath = path.charAt(0) === "/" ? path : ("/" + path);
-                var base = getApiBase();
+                var base = (baseOverride || getApiBase() || "").replace(/\/+$/, "");
                 return base ? (base + cleanPath) : cleanPath;
+            }
+
+            async function fetchWithFallback(path, options) {
+                var primaryBase = getApiBase();
+                var primaryUrl = toApiUrl(path, primaryBase);
+                try {
+                    return await fetch(primaryUrl, options || {});
+                } catch (primaryError) {
+                    var fallbackBase = (window.location && window.location.origin && window.location.protocol !== "file:") ? window.location.origin : "";
+                    var fallbackUrl = toApiUrl(path, fallbackBase);
+                    if (!fallbackBase || fallbackUrl === primaryUrl) {
+                        throw primaryError;
+                    }
+                    return await fetch(fallbackUrl, options || {});
+                }
             }
 
             async function postJson(url, payload) {
@@ -861,8 +884,7 @@
                 var data;
 
                 try {
-                    var requestUrl = toApiUrl(url);
-                    response = await fetch(requestUrl, {
+                    response = await fetchWithFallback(url, {
                         method: "POST",
                         headers: {
                             "Content-Type": "application/json"
@@ -870,7 +892,7 @@
                         body: JSON.stringify(payload)
                     });
                 } catch (error) {
-                    throw new Error("Cannot reach the sync server. If hosted on Render, set \"Sync API base URL\" to your Render URL (for example https://your-app.onrender.com). For local mode use http://127.0.0.1:3456.");
+                    throw new Error("Cannot reach the sync server. If hosted on Render, set \"Sync API base URL\" to your Render URL root (for example https://your-app.onrender.com). Do not include /odoo-migration in this field. For local mode use http://127.0.0.1:3456.");
                 }
 
                 try {
@@ -890,10 +912,9 @@
                 var data;
 
                 try {
-                    var requestUrl = toApiUrl(url);
-                    response = await fetch(requestUrl);
+                    response = await fetchWithFallback(url);
                 } catch (error) {
-                    throw new Error("Cannot reach the sync server. If hosted on Render, set \"Sync API base URL\" to your Render URL (for example https://your-app.onrender.com). For local mode use http://127.0.0.1:3456.");
+                    throw new Error("Cannot reach the sync server. If hosted on Render, set \"Sync API base URL\" to your Render URL root (for example https://your-app.onrender.com). Do not include /odoo-migration in this field. For local mode use http://127.0.0.1:3456.");
                 }
 
                 try {

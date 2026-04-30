@@ -229,6 +229,22 @@ async function shopifyGraphql(shopDomain, accessToken, query, variables) {
     return payload.data;
 }
 
+async function shopifyRest(shopDomain, accessToken, method, endpoint, payload) {
+    const response = await fetch(`https://${shopDomain}/admin/api/${API_VERSION}${endpoint}`, {
+        method,
+        headers: {
+            "Content-Type": "application/json",
+            "X-Shopify-Access-Token": accessToken
+        },
+        body: payload ? JSON.stringify(payload) : undefined
+    });
+    const data = await response.json();
+    if (!response.ok) {
+        throw new Error((data && data.errors && JSON.stringify(data.errors)) || `HTTP ${response.status}`);
+    }
+    return data;
+}
+
 function parseEscapedKeyValueLines(text) {
     const input = String(text || "");
     if (!input.trim()) {
@@ -891,6 +907,49 @@ async function handleApiRequest(request, response) {
             ok: true,
             job: getJobPayload(job)
         });
+        return;
+    }
+
+    if (request.method === "POST" && url.pathname === "/api/products/sync") {
+        try {
+            const body = await readJsonBody(request);
+            const shopDomain = normalizeShopDomain(body.shopDomain);
+            const accessToken = String(body.accessToken || "").trim();
+            const products = Array.isArray(body.products) ? body.products : [];
+            if (!shopDomain || !accessToken || !products.length) {
+                throw new Error("shopDomain, accessToken, and products are required.");
+            }
+            const summary = { created: 0, updated: 0, failed: 0 };
+            for (const row of products) {
+                try {
+                    const handle = String(row.Name || "product").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+                    const search = await shopifyGraphql(shopDomain, accessToken, `query($query: String!){products(first:1, query:$query){nodes{id handle}}}`, { query: `handle:${handle}` });
+                    const existing = search && search.products && search.products.nodes && search.products.nodes[0];
+                    const productPayload = {
+                        product: {
+                            title: row.Name || "Untitled",
+                            body_html: row.Description || row["Short description"] || "",
+                            handle: handle,
+                            tags: [row.Categories, row.Tags].filter(Boolean).join(", "),
+                            variants: [{ sku: row.SKU || "", price: row["Sale price"] || row["Regular price"] || "0", compare_at_price: row["Regular price"] || null, inventory_quantity: Number(row.Stock || 0) }]
+                        }
+                    };
+                    if (existing && existing.id) {
+                        const numericId = String(existing.id).split("/").pop();
+                        await shopifyRest(shopDomain, accessToken, "PUT", `/products/${numericId}.json`, { product: { id: Number(numericId), ...productPayload.product } });
+                        summary.updated += 1;
+                    } else {
+                        await shopifyRest(shopDomain, accessToken, "POST", "/products.json", productPayload);
+                        summary.created += 1;
+                    }
+                } catch (error) {
+                    summary.failed += 1;
+                }
+            }
+            sendJson(response, 200, { ok: true, summary });
+        } catch (error) {
+            sendJson(response, 400, { ok: false, error: error.message });
+        }
         return;
     }
 

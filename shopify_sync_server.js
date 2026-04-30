@@ -962,23 +962,32 @@ async function handleApiRequest(request, response) {
 function handleStaticRequest(request, response) {
     const url = new URL(request.url, `http://${request.headers.host}`);
 
-    if (url.pathname === "/" || url.pathname === "/index.html") {
-        sendFile(response, path.join(__dirname, "frontend_pages.html"));
+    const staticRoutes = {
+        "/": "frontend_pages.html",
+        "/index.html": "frontend_pages.html",
+        "/odoo-migration": "odoo-migration.html",
+        "/woocommerce-migration": "woocommerce-migration.html",
+        "/migration-tool": "odoo_matrixify_browser.html",
+        "/admin": "admin_panel.html",
+        "/odoo_matrixify_converter.js": "odoo_matrixify_converter.js",
+        "/home.html": "home.html",
+        "/services.html": "services.html",
+        "/security.html": "security.html",
+        "/migration-tool-page.html": "migration-tool-page.html"
+    };
+
+    if (staticRoutes[url.pathname]) {
+        sendFile(response, path.join(__dirname, staticRoutes[url.pathname]));
         return;
     }
 
-    if (url.pathname === "/migration-tool") {
-        sendFile(response, path.join(__dirname, "odoo_matrixify_browser.html"));
-        return;
-    }
-
-    if (url.pathname === "/admin") {
-        sendFile(response, path.join(__dirname, "admin_panel.html"));
-        return;
-    }
-
-    if (url.pathname === "/odoo_matrixify_converter.js") {
-        sendFile(response, path.join(__dirname, "odoo_matrixify_converter.js"));
+    if (url.pathname.endsWith(".html")) {
+        const htmlPath = path.normalize(path.join(__dirname, url.pathname));
+        if (!htmlPath.startsWith(__dirname)) {
+            sendText(response, 403, "Forbidden");
+            return;
+        }
+        sendFile(response, htmlPath);
         return;
     }
 

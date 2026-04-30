@@ -1091,7 +1091,8 @@ function handleStaticRequest(request, response) {
         "/home.html": "home.html",
         "/services.html": "services.html",
         "/security.html": "security.html",
-        "/migration-tool-page.html": "migration-tool-page.html"
+        "/migration-tool-page.html": "migration-tool-page.html",
+        "/wp-to-shopify-migration": "wp-to-shopify-migration.html"
     };
 
     if (staticRoutes[url.pathname]) {

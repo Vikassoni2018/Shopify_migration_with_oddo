@@ -10,66 +10,10 @@
 </style>
 </head>
 <body>
-<div class='topbar'>Dedicated WooCommerce product migration page with direct CSV and Shopify API update modes.</div>
-<header class='header'><div class='brand'>Migration Portal</div><nav class='nav'><a href='/'>Home</a><a href='/odoo-migration'>Odoo Migration</a><a href='/woocommerce-migration'>WooCommerce Migration</a><a href='/admin'>Admin</a></nav></header>
-<section class='container'>
-  <h2 class='section-title'>WooCommerce → Shopify Product Import (Two Methods)</h2>
-  <p class='section-sub'>Use tabs to choose a migration method: generate Shopify CSV directly from WooCommerce CSV, or push updates to Shopify using API credentials.</p>
-
-  <div class='tabs'>
-    <button class='tab-btn active' data-tab='csv-mode'>Method 1: Direct CSV Convert</button>
-    <button class='tab-btn' data-tab='api-mode'>Method 2: Shopify API Update</button>
-    <button class='tab-btn' data-tab='fields-mode'>Reference: All Fields Mapping</button>
-  </div>
-
-  <div id='csv-mode' class='tab-panel active tool-card'>
-    <h3>Upload WooCommerce CSV and download Shopify product CSV</h3>
-    <div class='field'><label for='wooCsvFile'>WooCommerce Products CSV</label><input id='wooCsvFile' type='file' accept='.csv'></div>
-    <div style='margin-top:10px;display:flex;gap:8px;'>
-      <button id='convertCsvBtn' class='btn'>Convert to Shopify CSV</button>
-      <button id='downloadCsvBtn' class='btn secondary' disabled>Download Shopify CSV</button>
-    </div>
-    <div id='csvStatus' class='status'></div>
-  </div>
-
-  <div id='api-mode' class='tab-panel tool-card'>
-    <h3>Connect Shopify and update/create products from WooCommerce CSV</h3>
-    <div class='grid-2'>
-      <div class='field'><label for='shopDomain'>Shopify Domain</label><input id='shopDomain' placeholder='your-store.myshopify.com'></div>
-      <div class='field'><label for='shopToken'>Shopify Admin Access Token</label><input id='shopToken' placeholder='shpat_...'></div>
-    </div>
-    <div class='field' style='margin-top:10px;'><label for='wooCsvApiFile'>WooCommerce Products CSV</label><input id='wooCsvApiFile' type='file' accept='.csv'></div>
-    <p class='small'>This mode calls a backend endpoint <code>/api/woocommerce/shopify-sync-products</code> with domain, token, and CSV content.</p>
-    <button id='syncBtn' class='btn'>Run Shopify Product Sync</button>
-    <div id='apiStatus' class='status'></div>
-    <div id='apiResults' class='table-wrap'></div>
-  </div>
-
-  <div id='fields-mode' class='tab-panel tool-card'>
-    <h3>WooCommerce and Shopify Product Fields (Comprehensive Mapping)</h3>
-    <p class='small'>The converter attempts to map all common fields without skipping any core field.</p>
-    <ul>
-      <li><strong>WooCommerce fields read:</strong> ID, Type, SKU, Name, Published, Is featured?, Visibility in catalog, Short description, Description, Date sale price starts, Date sale price ends, Tax status, Tax class, In stock?, Stock, Backorders allowed?, Sold individually?, Weight (lbs), Length (in), Width (in), Height (in), Allow customer reviews?, Purchase note, Sale price, Regular price, Categories, Tags, Shipping class, Images, Download limit, Download expiry days, Parent, Grouped products, Upsells, Cross-sells, External URL, Button text, Position, Attribute 1..N data/default, Meta fields.</li>
-      <li><strong>Shopify CSV output fields:</strong> Handle, Title, Body (HTML), Vendor, Product Category, Type, Tags, Published, Option1 Name/Value, Option2 Name/Value, Option3 Name/Value, Variant SKU, Variant Grams, Variant Inventory Tracker, Variant Inventory Qty, Variant Inventory Policy, Variant Fulfillment Service, Variant Price, Variant Compare At Price, Variant Requires Shipping, Variant Taxable, Variant Barcode, Image Src, Image Position, Image Alt Text, Gift Card, SEO Title, SEO Description, Google Shopping fields, Variant Image, Variant Weight Unit, Cost per item, Status.</li>
-    </ul>
-  </div>
-</section>
-<script>
-const tabButtons=[...document.querySelectorAll('.tab-btn')];
-const tabPanels=[...document.querySelectorAll('.tab-panel')];
-tabButtons.forEach(btn=>btn.addEventListener('click',()=>{tabButtons.forEach(b=>b.classList.remove('active'));tabPanels.forEach(p=>p.classList.remove('active'));btn.classList.add('active');document.getElementById(btn.dataset.tab).classList.add('active');}));
-
-let convertedCsv='';
-function parseCsv(text){const rows=[];let row=[];let cur='';let q=false;for(let i=0;i<text.length;i++){const c=text[i];if(c==='"'){if(q&&text[i+1]==='"'){cur+='"';i++;}else q=!q;}else if(c===','&&!q){row.push(cur);cur='';}else if((c==='\n'||c==='\r')&&!q){if(c==='\r'&&text[i+1]==='\n')i++;row.push(cur);if(row.some(v=>v!==''))rows.push(row);row=[];cur='';}else cur+=c;}row.push(cur);if(row.some(v=>v!==''))rows.push(row);return rows;}
-function csvEscape(v){const s=String(v??'');return /[",\n]/.test(s)?`"${s.replace(/"/g,'""')}"`:s;}
-function rowsToCsv(rows){return rows.map(r=>r.map(csvEscape).join(',')).join('\n');}
-function slugify(s){return String(s||'product').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'')||'product';}
-function convertWooToShopify(wooRows){if(wooRows.length<2)throw new Error('CSV has no data rows.');const headers=wooRows[0];const idx=Object.fromEntries(headers.map((h,i)=>[h.trim().toLowerCase(),i]));const g=(r,k)=>r[idx[k]]||'';const outHeaders=['Handle','Title','Body (HTML)','Vendor','Product Category','Type','Tags','Published','Option1 Name','Option1 Value','Variant SKU','Variant Grams','Variant Inventory Tracker','Variant Inventory Qty','Variant Inventory Policy','Variant Fulfillment Service','Variant Price','Variant Compare At Price','Variant Requires Shipping','Variant Taxable','Image Src','Image Position','Status'];const out=[outHeaders];for(let i=1;i<wooRows.length;i++){const r=wooRows[i];const title=g(r,'name')||g(r,'title');const handle=slugify(title||g(r,'sku'));const body=g(r,'description')||g(r,'short description');const tags=[g(r,'categories'),g(r,'tags')].filter(Boolean).join(', ');const stock=g(r,'stock');const price=g(r,'regular price')||g(r,'price');const compare=g(r,'sale price')?price:'';out.push([handle,title,body,'','',g(r,'type'),tags,(g(r,'published')||'1')==='1'?'TRUE':'FALSE','Title','Default Title',g(r,'sku'),'', 'shopify',stock||'0','deny','manual',g(r,'sale price')||price,compare,'TRUE', (g(r,'tax status')||'taxable')!=='none'?'TRUE':'FALSE', (g(r,'images')||'').split(',')[0]||'', '1', (g(r,'published')||'1')==='1'?'active':'draft']);}return rowsToCsv(out);}
-
-document.getElementById('convertCsvBtn').addEventListener('click', async()=>{const file=document.getElementById('wooCsvFile').files[0];const st=document.getElementById('csvStatus');if(!file){st.textContent='Please choose WooCommerce CSV file.';return;}const text=await file.text();try{convertedCsv=convertWooToShopify(parseCsv(text));document.getElementById('downloadCsvBtn').disabled=false;st.textContent=`Converted ${parseCsv(text).length-1} products to Shopify CSV format.`;}catch(e){st.textContent=e.message;}});
-document.getElementById('downloadCsvBtn').addEventListener('click',()=>{const blob=new Blob([convertedCsv],{type:'text/csv;charset=utf-8;'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='shopify-products-import.csv';a.click();URL.revokeObjectURL(a.href);});
-
-document.getElementById('syncBtn').addEventListener('click',async()=>{const st=document.getElementById('apiStatus');const results=document.getElementById('apiResults');const domain=document.getElementById('shopDomain').value.trim();const token=document.getElementById('shopToken').value.trim();const file=document.getElementById('wooCsvApiFile').files[0];if(!domain||!token||!file){st.textContent='Please fill domain, token, and CSV file.';return;}st.textContent='Sync in progress...';const csvText=await file.text();try{const res=await fetch('/api/woocommerce/shopify-sync-products',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({shopDomain:domain,accessToken:token,csvText})});const data=await res.json();if(!res.ok)throw new Error(data.error||'Sync failed');st.textContent=`Sync completed. Processed ${data.total||0} products.`;results.innerHTML=(data.results||[]).length?`<table><tr><th>Title</th><th>Action</th><th>Shopify ID</th><th>Status</th></tr>${data.results.map(r=>`<tr><td>${r.title||''}</td><td>${r.action||''}</td><td>${r.shopifyId||''}</td><td>${r.status||''}</td></tr>`).join('')}</table>`:'';}catch(e){st.textContent=e.message;}});
-</script>
+<div class='topbar'>Dedicated WooCommerce migration page.</div>
+<header class='header'><div class='brand'>Migration Portal</div><nav class='nav'><a href='/'>Home</a><a href='/odoo-migration'>Odoo Migration</a><a href='/woocommerce-migration'>WooCommerce Migration</a><a href='/wp-to-shopify-migration'>WP → Shopify Import</a><a href='/admin'>Admin</a></nav></header>
+<section class='container'><h2 class='section-title'>WooCommerce Migration Services</h2><div class='grid grid-3'><div class='item'><h3>Products</h3><p>Catalog and SKU migration with category mapping.</p></div><div class='item'><h3>Customers</h3><p>Customer profiles and address migration.</p></div><div class='item'><h3>Orders</h3><p>Order history and status migration.</p></div></div></section>
+<section class='container steps'><h2 class='section-title'>Process</h2><div class='grid grid-3'><div class='item'><span class='icon'>1</span><h3>Audit</h3><p>Check source data quality.</p></div><div class='item'><span class='icon'>2</span><h3>Transform</h3><p>Map into WooCommerce format.</p></div><div class='item'><span class='icon'>3</span><h3>Launch</h3><p>Import and verify storefront data.</p></div></div></section>
+<section class='container'><h2 class='section-title'>New Product Migration Tool</h2><p class='section-sub'>Use the dedicated tabbed workflow for WooCommerce product import to Shopify: direct CSV conversion or direct Shopify API update.</p><p><a href='/wp-to-shopify-migration'>Open WP → Shopify Product Tool</a></p></section>
 </body>
 </html>

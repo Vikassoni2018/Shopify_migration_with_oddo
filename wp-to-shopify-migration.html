@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang='en'>
+<head>
+  <meta charset='utf-8'>
+  <meta name='viewport' content='width=device-width,initial-scale=1'>
+  <title>WooCommerce → Shopify Product Migration</title>
+  <link rel='stylesheet' href='/assets/css/frontend.css'>
+  <style>
+    .tabs{display:flex;gap:10px;flex-wrap:wrap;margin:14px 0}
+    .tab-btn{padding:10px 14px;border:1px solid #d7dbe7;border-radius:8px;background:#fff;cursor:pointer}
+    .tab-btn.active{background:#111827;color:#fff}
+    .tab-panel{display:none}
+    .tab-panel.active{display:block}
+    .form-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px}
+    .form-grid input, .form-grid textarea{width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:8px}
+    .actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px}
+    .btn{padding:10px 14px;border:none;border-radius:8px;cursor:pointer;background:#1f2937;color:#fff}
+    .btn.secondary{background:#475569}
+    .log{background:#0f172a;color:#e2e8f0;padding:10px;border-radius:8px;white-space:pre-wrap;min-height:80px}
+    table{width:100%;border-collapse:collapse;margin-top:10px}
+    th,td{padding:8px;border:1px solid #e2e8f0;font-size:13px;text-align:left}
+  </style>
+</head>
+<body>
+<div class='topbar'>Two methods: direct CSV conversion and API sync to Shopify.</div>
+<header class='header'><div class='brand'>Migration Portal</div><nav class='nav'><a href='/'>Home</a><a href='/odoo-migration'>Odoo Migration</a><a href='/woocommerce-migration'>WooCommerce Migration</a><a href='/wp-to-shopify-migration'>WP → Shopify Import</a><a href='/admin'>Admin</a></nav></header>
+<section class='container'>
+  <h2 class='section-title'>WordPress WooCommerce Products → Shopify</h2>
+  <p class='section-sub'>Tab 1 creates a Shopify import CSV from a WooCommerce export CSV. Tab 2 syncs products directly to Shopify using domain + access token.</p>
+
+  <div class='tabs'>
+    <button class='tab-btn active' data-tab='convert'>Method 1: Direct CSV Upload</button>
+    <button class='tab-btn' data-tab='sync'>Method 2: Shopify API Update</button>
+    <button class='tab-btn' data-tab='fields'>WooCommerce + Shopify Fields</button>
+  </div>
+
+  <div id='convert' class='tab-panel active'>
+    <h3>Convert WooCommerce CSV to Shopify Product CSV</h3>
+    <input id='wcCsvFile' type='file' accept='.csv,text/csv'>
+    <div class='actions'>
+      <button class='btn' id='convertBtn'>Generate Shopify CSV</button>
+      <button class='btn secondary' id='downloadBtn' disabled>Download Shopify CSV</button>
+    </div>
+    <div id='convertLog' class='log'></div>
+  </div>
+
+  <div id='sync' class='tab-panel'>
+    <h3>Sync/Update Products in Shopify from WooCommerce CSV</h3>
+    <div class='form-grid'>
+      <div><label>Shopify Domain</label><input id='shopDomain' placeholder='your-store.myshopify.com'></div>
+      <div><label>Shopify Access Token</label><input id='accessToken' placeholder='shpat_xxx'></div>
+      <div><label>WooCommerce Product CSV</label><input id='syncCsvFile' type='file' accept='.csv,text/csv'></div>
+    </div>
+    <div class='actions'><button class='btn' id='syncBtn'>Upload & Update Shopify Products</button></div>
+    <div id='syncLog' class='log'></div>
+  </div>
+
+  <div id='fields' class='tab-panel'>
+    <h3>Field coverage and mapping (comprehensive common fields)</h3>
+    <table>
+      <thead><tr><th>WooCommerce Field</th><th>Shopify CSV Field</th><th>Logic</th></tr></thead>
+      <tbody id='fieldTable'></tbody>
+    </table>
+  </div>
+</section>
+<script>
+const mapping = [
+['Name','Title','Direct'],['Description','Body (HTML)','Direct'],['Short description','SEO Description','Fallback'],['SKU','Variant SKU','Direct'],['Regular price','Variant Compare At Price','Direct'],['Sale price','Variant Price','Fallback to Regular price'],['Stock','Variant Inventory Qty','Numeric'],['Categories','Type','First category'],['Tags','Tags','Direct'],['Images','Image Src','First image'],['Weight (kg)','Variant Grams','kg→grams'],['Published','Published','yes/1→TRUE'],['Attribute 1 name','Option1 Name','Direct'],['Attribute 1 value(s)','Option1 Value','Direct'],['Attribute 2 name','Option2 Name','Direct'],['Attribute 2 value(s)','Option2 Value','Direct'],['Attribute 3 name','Option3 Name','Direct'],['Attribute 3 value(s)','Option3 Value','Direct'],['Slug','Handle','fallback from Name'],['Meta: _yoast_wpseo_title','SEO Title','Direct']
+];
+const shopifyHeaders = ['Handle','Title','Body (HTML)','Vendor','Type','Tags','Published','Option1 Name','Option1 Value','Option2 Name','Option2 Value','Option3 Name','Option3 Value','Variant SKU','Variant Grams','Variant Inventory Tracker','Variant Inventory Qty','Variant Inventory Policy','Variant Fulfillment Service','Variant Price','Variant Compare At Price','Variant Requires Shipping','Variant Taxable','Variant Barcode','Image Src','Image Position','Image Alt Text','Gift Card','SEO Title','SEO Description','Google Shopping / Google Product Category','Google Shopping / Gender','Google Shopping / Age Group','Google Shopping / MPN','Google Shopping / Condition','Google Shopping / Custom Product','Google Shopping / Custom Label 0','Google Shopping / Custom Label 1','Google Shopping / Custom Label 2','Google Shopping / Custom Label 3','Google Shopping / Custom Label 4','Variant Image','Variant Weight Unit','Status'];
+let convertedCsv = '';
+
+function parseCSV(text){
+  const rows=[];let row=[],cell='',q=false;
+  for(let i=0;i<text.length;i++){const c=text[i],n=text[i+1];
+    if(c==='"'){if(q&&n==='"'){cell+='"';i++;}else{q=!q;}}
+    else if(c===','&&!q){row.push(cell);cell='';}
+    else if((c==='\n'||c==='\r')&&!q){if(c==='\r'&&n==='\n')i++;row.push(cell);rows.push(row);row=[];cell='';}
+    else cell+=c;
+  }
+  if(cell.length||row.length){row.push(cell);rows.push(row);}return rows;
+}
+function csvEscape(v){const s=String(v??'');return /[",\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s;}
+function wcToShopifyRow(w){
+  const handle=(w['Slug']||w['Name']||'product').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');
+  return {
+    'Handle':handle,'Title':w['Name']||'','Body (HTML)':w['Description']||'','Vendor':w['Brands']||'','Type':(w['Categories']||'').split(',')[0]?.trim()||'','Tags':w['Tags']||'','Published':(['1','yes','true'].includes(String(w['Published']||'').toLowerCase())?'TRUE':'FALSE'),'Option1 Name':w['Attribute 1 name']||'Title','Option1 Value':w['Attribute 1 value(s)']||'Default Title','Option2 Name':w['Attribute 2 name']||'','Option2 Value':w['Attribute 2 value(s)']||'','Option3 Name':w['Attribute 3 name']||'','Option3 Value':w['Attribute 3 value(s)']||'','Variant SKU':w['SKU']||'','Variant Grams':Math.round((parseFloat(w['Weight (kg)']||'0')||0)*1000),'Variant Inventory Tracker':'shopify','Variant Inventory Qty':Number(w['Stock']||0)||0,'Variant Inventory Policy':'deny','Variant Fulfillment Service':'manual','Variant Price':w['Sale price']||w['Regular price']||'0','Variant Compare At Price':w['Regular price']||'','Variant Requires Shipping':'TRUE','Variant Taxable':'TRUE','Variant Barcode':w['GTIN, UPC, EAN, or ISBN']||'','Image Src':(w['Images']||'').split(',')[0]?.trim()||'','Image Position':'1','Image Alt Text':w['Name']||'','Gift Card':'FALSE','SEO Title':w['Meta: _yoast_wpseo_title']||w['Name']||'','SEO Description':w['Meta: _yoast_wpseo_metadesc']||w['Short description']||'','Google Shopping / Google Product Category':'','Google Shopping / Gender':'','Google Shopping / Age Group':'','Google Shopping / MPN':w['Meta: _wc_gpf_mpn']||'','Google Shopping / Condition':'new','Google Shopping / Custom Product':'FALSE','Google Shopping / Custom Label 0':'','Google Shopping / Custom Label 1':'','Google Shopping / Custom Label 2':'','Google Shopping / Custom Label 3':'','Google Shopping / Custom Label 4':'','Variant Image':'','Variant Weight Unit':'kg','Status':'active'
+  }
+}
+
+document.querySelectorAll('.tab-btn').forEach(b=>b.onclick=()=>{document.querySelectorAll('.tab-btn').forEach(x=>x.classList.remove('active'));document.querySelectorAll('.tab-panel').forEach(x=>x.classList.remove('active'));b.classList.add('active');document.getElementById(b.dataset.tab).classList.add('active');});
+document.getElementById('fieldTable').innerHTML=mapping.map(m=>`<tr><td>${m[0]}</td><td>${m[1]}</td><td>${m[2]}</td></tr>`).join('');
+
+document.getElementById('convertBtn').onclick=async()=>{
+  const f=document.getElementById('wcCsvFile').files[0]; if(!f)return alert('Select WooCommerce CSV first');
+  const t=await f.text(); const rows=parseCSV(t); const headers=rows[0]||[];
+  const objects=rows.slice(1).filter(r=>r.some(v=>String(v).trim())).map(r=>Object.fromEntries(headers.map((h,i)=>[h,r[i]||''])));
+  const out=[shopifyHeaders.join(',')];
+  objects.forEach(o=>{const s=wcToShopifyRow(o);out.push(shopifyHeaders.map(h=>csvEscape(s[h]||'')).join(','));});
+  convertedCsv=out.join('\n');
+  document.getElementById('downloadBtn').disabled=false;
+  document.getElementById('convertLog').textContent=`Converted ${objects.length} product rows to Shopify CSV.`;
+}
+
+document.getElementById('downloadBtn').onclick=()=>{
+  const blob=new Blob([convertedCsv],{type:'text/csv;charset=utf-8;'}); const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob); a.download='shopify_products_import.csv'; a.click();
+};
+
+document.getElementById('syncBtn').onclick=async()=>{
+  const domain=document.getElementById('shopDomain').value.trim();
+  const token=document.getElementById('accessToken').value.trim();
+  const f=document.getElementById('syncCsvFile').files[0]; if(!domain||!token||!f)return alert('Enter domain, token, and CSV file');
+  const t=await f.text(); const rows=parseCSV(t); const headers=rows[0]||[];
+  const products=rows.slice(1).filter(r=>r.some(v=>String(v).trim())).map(r=>Object.fromEntries(headers.map((h,i)=>[h,r[i]||''])));
+  const res=await fetch('/api/products/sync',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({shopDomain:domain,accessToken:token,products})});
+  const data=await res.json();
+  document.getElementById('syncLog').textContent = data.ok ? `Sync done. Created: ${data.summary.created}, Updated: ${data.summary.updated}, Failed: ${data.summary.failed}` : `Error: ${data.error}`;
+}
+</script>
+</body>
+</html>

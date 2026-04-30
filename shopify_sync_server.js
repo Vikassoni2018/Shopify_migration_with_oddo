@@ -324,6 +324,67 @@ function unescapeMatrixifyValue(text) {
     return output;
 }
 
+function parseSimpleCsv(csvText) {
+    const text = String(csvText || "");
+    const rows = [];
+    let row = [];
+    let value = "";
+    let inQuotes = false;
+
+    for (let index = 0; index < text.length; index += 1) {
+        const char = text[index];
+
+        if (char === "\"") {
+            if (inQuotes && text[index + 1] === "\"") {
+                value += "\"";
+                index += 1;
+            } else {
+                inQuotes = !inQuotes;
+            }
+            continue;
+        }
+
+        if (char === "," && !inQuotes) {
+            row.push(value);
+            value = "";
+            continue;
+        }
+
+        if ((char === "\n" || char === "\r") && !inQuotes) {
+            if (char === "\r" && text[index + 1] === "\n") {
+                index += 1;
+            }
+            row.push(value);
+            if (row.some((cell) => String(cell || "").length > 0)) {
+                rows.push(row);
+            }
+            row = [];
+            value = "";
+            continue;
+        }
+
+        value += char;
+    }
+
+    row.push(value);
+    if (row.some((cell) => String(cell || "").length > 0)) {
+        rows.push(row);
+    }
+
+    if (!rows.length) {
+        return [];
+    }
+
+    const headers = rows[0].map((header) => String(header || "").trim());
+    return rows.slice(1).map((cells) => {
+        const output = {};
+        headers.forEach((header, columnIndex) => {
+            output[header] = cells[columnIndex] || "";
+        });
+        return output;
+    });
+}
+
 function mapPaymentStatus(value) {
     const normalized = String(value || "").trim().toLowerCase();
 
@@ -947,6 +1008,63 @@ async function handleApiRequest(request, response) {
                 }
             }
             sendJson(response, 200, { ok: true, summary });
+        } catch (error) {
+            sendJson(response, 400, { ok: false, error: error.message });
+        }
+        return;
+    }
+
+    if (request.method === "POST" && url.pathname === "/api/woocommerce/shopify-sync-products") {
+        try {
+            const body = await readJsonBody(request);
+            const shopDomain = normalizeShopDomain(body.shopDomain);
+            const accessToken = String(body.accessToken || "").trim();
+            const products = parseSimpleCsv(body.csvText || "");
+            if (!shopDomain || !accessToken || !products.length) {
+                throw new Error("shopDomain, accessToken, and csvText are required.");
+            }
+
+            const results = [];
+            for (const row of products) {
+                const title = row.Name || row.Title || "Untitled";
+                const handle = String(title || row.SKU || "product")
+                    .toLowerCase()
+                    .replace(/[^a-z0-9]+/g, "-")
+                    .replace(/^-|-$/g, "");
+                try {
+                    const search = await shopifyGraphql(shopDomain, accessToken, `query($query: String!){products(first:1, query:$query){nodes{id}}}`, { query: `handle:${handle}` });
+                    const existing = search && search.products && search.products.nodes && search.products.nodes[0];
+                    const productPayload = {
+                        product: {
+                            title,
+                            body_html: row.Description || row["Short description"] || "",
+                            handle,
+                            tags: [row.Categories, row.Tags].filter(Boolean).join(", "),
+                            status: (String(row.Published || "1") === "1" || String(row.Published || "").toLowerCase() === "true") ? "active" : "draft",
+                            variants: [{
+                                sku: row.SKU || "",
+                                price: row["Sale price"] || row["Regular price"] || row.Price || "0",
+                                compare_at_price: row["Regular price"] || null,
+                                inventory_quantity: Number(row.Stock || 0)
+                            }]
+                        }
+                    };
+
+                    if (existing && existing.id) {
+                        const numericId = String(existing.id).split("/").pop();
+                        await shopifyRest(shopDomain, accessToken, "PUT", `/products/${numericId}.json`, { product: { id: Number(numericId), ...productPayload.product } });
+                        results.push({ title, action: "update", shopifyId: numericId, status: "ok" });
+                    } else {
+                        const created = await shopifyRest(shopDomain, accessToken, "POST", "/products.json", productPayload);
+                        const shopifyId = created && created.product && created.product.id;
+                        results.push({ title, action: "create", shopifyId: shopifyId || "", status: "ok" });
+                    }
+                } catch (error) {
+                    results.push({ title, action: "error", shopifyId: "", status: error.message });
+                }
+            }
+
+            sendJson(response, 200, { ok: true, total: results.length, results });
         } catch (error) {
             sendJson(response, 400, { ok: false, error: error.message });
         }

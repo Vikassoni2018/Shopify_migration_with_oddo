@@ -458,15 +458,15 @@
     <div class="shell">
         <section class="hero">
             <article class="hero-card">
-                <span class="eyebrow">Local Shopify Sync</span>
+                <span class="eyebrow">Shopify Sync Workspace</span>
                 <h1>Upload Odoo CSV. Connect Shopify. Create missing orders and update existing ones.</h1>
                 <p class="hero-copy">
-                    This local app keeps your Admin API token on your machine, prepares the CSV for Matrixify, and can also push orders directly into Shopify. Existing orders are updated with Shopify's safe order update fields instead of creating duplicates.
+                    This app prepares the CSV for Matrixify and can also push orders directly into Shopify. Existing orders are updated with Shopify's safe order update fields instead of creating duplicates, whether you run it locally or from Render.
                 </p>
                 <div class="hero-grid">
                     <div class="mini">
-                        <strong>Local token handling</strong>
-                        <span>The access token is sent only to the localhost app, not to a hosted website.</span>
+                        <strong>Environment-aware token flow</strong>
+                        <span>The access token is submitted only to this app's API endpoint and is never stored in your Git repository.</span>
                     </div>
                     <div class="mini">
                         <strong>Create or update</strong>
@@ -490,7 +490,7 @@
                         </div>
                         <div class="field">
                             <label for="timeZoneOffset">Order time offset</label>
-                            <input id="timeZoneOffset" type="text" value="+08:00" placeholder="Singapore time UTC+08:00">
+                            <input id="timeZoneOffset" type="text" value="" placeholder="UTC offset like +05:30 or +08:00">
                         </div>
                         <div class="field field-full">
                             <label for="accessToken">Admin API access token</label>
@@ -650,7 +650,7 @@
                     </div>
                     <div class="field">
                         <label for="wooApiBase">Sync API base URL (optional)</label>
-                        <input id="wooApiBase" type="text" placeholder="https://your-render-app.onrender.com">
+                        <input id="wooApiBase" type="text" placeholder="https://shopify-migration-with-oddo.onrender.com">
                     </div>
                     <div class="field field-full">
                         <label class="dropzone" id="wooDropzone">
@@ -711,6 +711,7 @@
         (function () {
             "use strict";
 
+            var appConfig = window.APP_CONFIG || {};
             var converter = window.OdooMatrixifyConverter;
             var shopDomainInput = document.getElementById("shopDomain");
             var accessTokenInput = document.getElementById("accessToken");
@@ -835,14 +836,49 @@
                 }, 1000);
             }
 
+            function normalizeApiBase(base) {
+                var value = String(base || "").trim();
+                return value ? value.replace(/\/+$/, "") : "";
+            }
+
+            function getConfiguredApiBase() {
+                return normalizeApiBase(appConfig.defaultApiBaseUrl || "");
+            }
+
+            function getLocalApiBase() {
+                return normalizeApiBase(appConfig.localApiBaseUrl || "http://127.0.0.1:3456");
+            }
+
+            function getDefaultTimeZoneOffset() {
+                var value = String(
+                    window.localStorage.getItem("timeZoneOffset")
+                    || appConfig.defaultTimeZoneOffset
+                    || timeZoneOffsetInput.value
+                    || "+08:00"
+                ).trim();
+
+                return /^([+-]\d{2}:\d{2}|Z)$/.test(value) ? value : "+08:00";
+            }
+
+            function buildSyncServerHelpMessage() {
+                var renderBase = getConfiguredApiBase() || "https://shopify-migration-with-oddo.onrender.com";
+                var localBase = getLocalApiBase() || "http://127.0.0.1:3456";
+                return "Cannot reach the sync server. If hosted on Render, set \"Sync API base URL\" to " + renderBase + ". Do not include /odoo-migration in this field. For local mode use " + localBase + ".";
+            }
 
             function getApiBase() {
-                var base = (wooApiBaseInput && wooApiBaseInput.value ? wooApiBaseInput.value : "").trim();
+                var base = normalizeApiBase(wooApiBaseInput && wooApiBaseInput.value ? wooApiBaseInput.value : "");
                 if (!base) {
-                    base = window.localStorage.getItem("wooApiBase") || "";
+                    base = normalizeApiBase(window.localStorage.getItem("wooApiBase") || "");
+                }
+                if (!base) {
+                    base = getConfiguredApiBase();
                 }
                 if (!base && window.location && window.location.origin && window.location.protocol !== "file:") {
-                    base = window.location.origin;
+                    base = normalizeApiBase(window.location.origin);
+                }
+                if (!base) {
+                    base = getLocalApiBase();
                 }
                 if (!base) {
                     return "";
@@ -854,29 +890,43 @@
                     var parsed = new URL(base, window.location.origin);
                     return parsed.origin;
                 } catch (error) {
-                    return base.replace(/\/+$/, "");
+                    return normalizeApiBase(base);
                 }
             }
 
             function toApiUrl(path, baseOverride) {
                 var cleanPath = path.charAt(0) === "/" ? path : ("/" + path);
-                var base = (baseOverride || getApiBase() || "").replace(/\/+$/, "");
+                var base = normalizeApiBase(baseOverride || getApiBase() || "");
                 return base ? (base + cleanPath) : cleanPath;
             }
 
             async function fetchWithFallback(path, options) {
-                var primaryBase = getApiBase();
-                var primaryUrl = toApiUrl(path, primaryBase);
-                try {
-                    return await fetch(primaryUrl, options || {});
-                } catch (primaryError) {
-                    var fallbackBase = (window.location && window.location.origin && window.location.protocol !== "file:") ? window.location.origin : "";
-                    var fallbackUrl = toApiUrl(path, fallbackBase);
-                    if (!fallbackBase || fallbackUrl === primaryUrl) {
-                        throw primaryError;
+                var candidates = [];
+
+                function addCandidate(value) {
+                    var candidate = normalizeApiBase(value);
+                    if (candidate && candidates.indexOf(candidate) === -1) {
+                        candidates.push(candidate);
                     }
-                    return await fetch(fallbackUrl, options || {});
                 }
+
+                addCandidate(getApiBase());
+                if (window.location && window.location.origin && window.location.protocol !== "file:") {
+                    addCandidate(window.location.origin);
+                }
+                addCandidate(getConfiguredApiBase());
+                addCandidate(getLocalApiBase());
+
+                var lastError = null;
+                for (var index = 0; index < candidates.length; index += 1) {
+                    try {
+                        return await fetch(toApiUrl(path, candidates[index]), options || {});
+                    } catch (error) {
+                        lastError = error;
+                    }
+                }
+
+                throw lastError || new Error("No API base URL could be resolved.");
             }
 
             async function postJson(url, payload) {
@@ -892,13 +942,13 @@
                         body: JSON.stringify(payload)
                     });
                 } catch (error) {
-                    throw new Error("Cannot reach the sync server. If hosted on Render, set \"Sync API base URL\" to your Render URL root (for example https://your-app.onrender.com). Do not include /odoo-migration in this field. For local mode use http://127.0.0.1:3456.");
+                    throw new Error(buildSyncServerHelpMessage());
                 }
 
                 try {
                     data = await response.json();
                 } catch (error) {
-                    throw new Error("The local sync server returned an invalid response.");
+                    throw new Error("The sync server returned an invalid response.");
                 }
 
                 if (!response.ok || !data.ok) {
@@ -914,13 +964,13 @@
                 try {
                     response = await fetchWithFallback(url);
                 } catch (error) {
-                    throw new Error("Cannot reach the sync server. If hosted on Render, set \"Sync API base URL\" to your Render URL root (for example https://your-app.onrender.com). Do not include /odoo-migration in this field. For local mode use http://127.0.0.1:3456.");
+                    throw new Error(buildSyncServerHelpMessage());
                 }
 
                 try {
                     data = await response.json();
                 } catch (error) {
-                    throw new Error("The local sync server returned an invalid response.");
+                    throw new Error("The sync server returned an invalid response.");
                 }
 
                 if (!response.ok || !data.ok) {
@@ -1255,7 +1305,7 @@
                     var response = await postJson("/api/import/start", {
                         shopDomain: shopDomainInput.value,
                         accessToken: accessTokenInput.value,
-                        timeZoneOffset: (timeZoneOffsetInput.value || "").trim() || "+08:00",
+                        timeZoneOffset: (timeZoneOffsetInput.value || "").trim() || getDefaultTimeZoneOffset(),
                         csvText: csvText
                     });
 
@@ -1459,9 +1509,17 @@
             });
 
             if (wooApiBaseInput) {
-                wooApiBaseInput.value = window.localStorage.getItem("wooApiBase") || "";
+                wooApiBaseInput.placeholder = getConfiguredApiBase() || "https://shopify-migration-with-oddo.onrender.com";
+                wooApiBaseInput.value = window.localStorage.getItem("wooApiBase") || getConfiguredApiBase() || "";
                 wooApiBaseInput.addEventListener("input", function () {
                     window.localStorage.setItem("wooApiBase", wooApiBaseInput.value.trim());
+                });
+            }
+
+            if (timeZoneOffsetInput) {
+                timeZoneOffsetInput.value = getDefaultTimeZoneOffset();
+                timeZoneOffsetInput.addEventListener("input", function () {
+                    window.localStorage.setItem("timeZoneOffset", timeZoneOffsetInput.value.trim());
                 });
             }
 

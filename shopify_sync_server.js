@@ -4,13 +4,35 @@ const path = require("path");
 const crypto = require("crypto");
 const converter = require("./odoo_matrixify_converter.js");
 
-const PORT = Number(process.env.PORT || 3456);
+loadEnvFile(path.join(__dirname, ".env"));
+
 const API_VERSION = "2026-04";
-const HOST = process.env.HOST || "0.0.0.0";
 const MAX_JSON_BODY_BYTES = 100 * 1024 * 1024;
 const FREE_ORDER_LIMIT = 10;
 const PER_THOUSAND_PRICE_USD_CENTS = 1000;
 const FULL_MIGRATION_PRICE_USD_CENTS = 10000;
+const DEFAULT_LOCAL_PORT = 3456;
+const PORT = Number.parseInt(String(process.env.PORT || DEFAULT_LOCAL_PORT), 10) || DEFAULT_LOCAL_PORT;
+const HOST = String(process.env.HOST || "0.0.0.0").trim() || "0.0.0.0";
+const DEFAULT_LOCAL_API_BASE_URL = normalizeBaseUrl(process.env.LOCAL_API_BASE_URL || `http://127.0.0.1:${PORT}`);
+const RUNTIME_SESSION_SECRET = crypto.randomBytes(32).toString("hex");
+const CONFIG = Object.freeze({
+    appName: String(process.env.APP_NAME || "Shopify Migration with Odoo").trim() || "Shopify Migration with Odoo",
+    host: HOST,
+    port: PORT,
+    nodeEnv: String(process.env.NODE_ENV || "development").trim() || "development",
+    publicBaseUrl: normalizeBaseUrl(process.env.PUBLIC_BASE_URL || process.env.APP_BASE_URL || process.env.RENDER_EXTERNAL_URL || ""),
+    defaultApiBaseUrl: normalizeBaseUrl(process.env.DEFAULT_API_BASE_URL || process.env.PUBLIC_BASE_URL || process.env.APP_BASE_URL || process.env.RENDER_EXTERNAL_URL || ""),
+    defaultTimeZoneOffset: sanitizeTimeZoneOffset(process.env.DEFAULT_TIMEZONE_OFFSET || "+08:00"),
+    localApiBaseUrl: DEFAULT_LOCAL_API_BASE_URL,
+    adminEmail: String(process.env.ADMIN_EMAIL || "").trim(),
+    adminPassword: String(process.env.ADMIN_PASSWORD || ""),
+    sessionSecret: String(process.env.APP_SESSION_SECRET || RUNTIME_SESSION_SECRET),
+    stripePublishableKey: String(process.env.STRIPE_PUBLISHABLE_KEY || "").trim(),
+    stripeSecretKey: String(process.env.STRIPE_SECRET_KEY || "").trim(),
+    stripeWebhookSecret: String(process.env.STRIPE_WEBHOOK_SECRET || "").trim(),
+    renderExternalUrl: normalizeBaseUrl(process.env.RENDER_EXTERNAL_URL || "")
+});
 const jobs = new Map();
 const entitlements = new Map();
 
@@ -75,24 +97,143 @@ mutation UpdateOrder($input: OrderInput!) {
 }
 `;
 
-function sendJson(response, statusCode, payload) {
+function loadEnvFile(filePath) {
+    let fileText = "";
+
+    try {
+        fileText = fs.readFileSync(filePath, "utf8");
+    } catch (error) {
+        if (error.code === "ENOENT") {
+            return;
+        }
+        throw error;
+    }
+
+    fileText.split(/\r?\n/).forEach((line) => {
+        const trimmed = line.trim();
+        if (!trimmed || trimmed.startsWith("#")) {
+            return;
+        }
+
+        const separatorIndex = trimmed.indexOf("=");
+        if (separatorIndex === -1) {
+            return;
+        }
+
+        const key = trimmed.slice(0, separatorIndex).trim();
+        if (!key || Object.prototype.hasOwnProperty.call(process.env, key)) {
+            return;
+        }
+
+        let value = trimmed.slice(separatorIndex + 1).trim();
+        if ((value.startsWith("\"") && value.endsWith("\"")) || (value.startsWith("'") && value.endsWith("'"))) {
+            value = value.slice(1, -1);
+        }
+
+        process.env[key] = value.replace(/\\n/g, "\n");
+    });
+}
+
+function normalizeBaseUrl(input) {
+    const raw = String(input || "").trim();
+    if (!raw) {
+        return "";
+    }
+
+    return raw.replace(/\/+$/, "");
+}
+
+function sanitizeTimeZoneOffset(input) {
+    const value = String(input || "").trim();
+    return /^([+-]\d{2}:\d{2}|Z)$/.test(value) ? value : "+08:00";
+}
+
+function buildCommonHeaders(contentType, contentLength, extraHeaders) {
+    return Object.assign({
+        "Content-Type": contentType,
+        "Content-Length": contentLength,
+        "Referrer-Policy": "same-origin",
+        "X-Content-Type-Options": "nosniff"
+    }, extraHeaders || {});
+}
+
+function buildApiHeaders(contentType, contentLength, extraHeaders) {
+    return buildCommonHeaders(contentType, contentLength, Object.assign({
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Headers": "Content-Type",
+        "Access-Control-Allow-Methods": "GET,POST,OPTIONS",
+        "Cache-Control": "no-store"
+    }, extraHeaders || {}));
+}
+
+function getRequestOrigin(request) {
+    const forwardedProto = String(request.headers["x-forwarded-proto"] || "").split(",")[0].trim();
+    const forwardedHost = String(request.headers["x-forwarded-host"] || "").split(",")[0].trim();
+    const host = forwardedHost || String(request.headers.host || "").trim();
+    const protocol = forwardedProto || "http";
+
+    if (!host) {
+        return "";
+    }
+
+    return normalizeBaseUrl(`${protocol}://${host}`);
+}
+
+function resolvePublicBaseUrl(request) {
+    return CONFIG.publicBaseUrl || CONFIG.renderExternalUrl || getRequestOrigin(request) || CONFIG.localApiBaseUrl;
+}
+
+function resolveDefaultApiBaseUrl(request) {
+    return CONFIG.defaultApiBaseUrl || resolvePublicBaseUrl(request) || CONFIG.localApiBaseUrl;
+}
+
+function buildRuntimeConfig(request) {
+    return {
+        appName: CONFIG.appName,
+        environment: CONFIG.nodeEnv,
+        publicBaseUrl: resolvePublicBaseUrl(request),
+        defaultApiBaseUrl: resolveDefaultApiBaseUrl(request),
+        localApiBaseUrl: CONFIG.localApiBaseUrl,
+        defaultTimeZoneOffset: CONFIG.defaultTimeZoneOffset,
+        renderExternalUrl: CONFIG.renderExternalUrl,
+        shopifyApiVersion: API_VERSION
+    };
+}
+
+function serializeRuntimeConfigScript(request) {
+    const payload = JSON.stringify(buildRuntimeConfig(request))
+        .replace(/</g, "\\u003c")
+        .replace(/>/g, "\\u003e")
+        .replace(/&/g, "\\u0026");
+
+    return `window.APP_CONFIG = Object.freeze(${payload});\n`;
+}
+
+function injectRuntimeConfig(htmlText) {
+    const runtimeScriptTag = "<script src=\"/app-config.js\"></script>";
+    if (htmlText.includes(runtimeScriptTag)) {
+        return htmlText;
+    }
+
+    if (htmlText.includes("</head>")) {
+        return htmlText.replace("</head>", `    ${runtimeScriptTag}\n</head>`);
+    }
+
+    return `${runtimeScriptTag}\n${htmlText}`;
+}
+
+function sendJson(response, statusCode, payload, extraHeaders) {
     const body = JSON.stringify(payload);
-    response.writeHead(statusCode, {
-        "Content-Type": "application/json; charset=utf-8",
-        "Content-Length": Buffer.byteLength(body)
-    });
+    response.writeHead(statusCode, buildApiHeaders("application/json; charset=utf-8", Buffer.byteLength(body), extraHeaders));
     response.end(body);
 }
 
-function sendText(response, statusCode, body, contentType) {
-    response.writeHead(statusCode, {
-        "Content-Type": contentType || "text/plain; charset=utf-8",
-        "Content-Length": Buffer.byteLength(body)
-    });
+function sendText(response, statusCode, body, contentType, extraHeaders) {
+    response.writeHead(statusCode, buildCommonHeaders(contentType || "text/plain; charset=utf-8", Buffer.byteLength(body), extraHeaders));
     response.end(body);
 }
 
-function sendFile(response, filePath) {
+function sendFile(response, request, filePath) {
     const extension = path.extname(filePath).toLowerCase();
     const contentType = extension === ".html"
         ? "text/html; charset=utf-8"
@@ -104,18 +245,254 @@ function sendFile(response, filePath) {
                     ? "image/svg+xml"
                     : "application/octet-stream";
 
-    fs.readFile(filePath, (error, buffer) => {
+    fs.readFile(filePath, extension === ".html" ? "utf8" : null, (error, fileContents) => {
         if (error) {
             sendText(response, 404, "Not found");
             return;
         }
 
-        response.writeHead(200, {
-            "Content-Type": contentType,
-            "Content-Length": buffer.length
-        });
-        response.end(buffer);
+        if (extension === ".html") {
+            const body = injectRuntimeConfig(fileContents);
+            sendText(response, 200, body, contentType, {
+                "Cache-Control": "no-store"
+            });
+            return;
+        }
+
+        response.writeHead(200, buildCommonHeaders(contentType, fileContents.length, {
+            "Cache-Control": extension === ".js" || extension === ".css" || extension === ".svg"
+                ? "public, max-age=3600"
+                : "public, max-age=300"
+        }));
+        response.end(fileContents);
     });
+}
+
+function isAdminConfigured() {
+    return Boolean(CONFIG.adminEmail && CONFIG.adminPassword);
+}
+
+function maskConfiguredValue(value) {
+    const text = String(value || "");
+    if (!text) {
+        return "";
+    }
+
+    if (text.length <= 8) {
+        return `${text.slice(0, 2)}***`;
+    }
+
+    return `${text.slice(0, 4)}...${text.slice(-4)}`;
+}
+
+function buildAdminConfigStatus() {
+    return {
+        appName: CONFIG.appName,
+        environment: CONFIG.nodeEnv,
+        publicBaseUrl: CONFIG.publicBaseUrl || "",
+        defaultApiBaseUrl: CONFIG.defaultApiBaseUrl || "",
+        defaultTimeZoneOffset: CONFIG.defaultTimeZoneOffset,
+        adminConfigured: isAdminConfigured(),
+        adminEmail: CONFIG.adminEmail || "",
+        stripePublishableKeyConfigured: Boolean(CONFIG.stripePublishableKey),
+        stripePublishableKeyPreview: maskConfiguredValue(CONFIG.stripePublishableKey),
+        stripeSecretKeyConfigured: Boolean(CONFIG.stripeSecretKey),
+        stripeWebhookSecretConfigured: Boolean(CONFIG.stripeWebhookSecret)
+    };
+}
+
+function parseCookies(request) {
+    const header = String(request.headers.cookie || "");
+    if (!header) {
+        return {};
+    }
+
+    return header.split(";").reduce((cookies, cookiePart) => {
+        const separatorIndex = cookiePart.indexOf("=");
+        if (separatorIndex === -1) {
+            return cookies;
+        }
+
+        const key = cookiePart.slice(0, separatorIndex).trim();
+        const value = cookiePart.slice(separatorIndex + 1).trim();
+        if (key) {
+            cookies[key] = decodeURIComponent(value);
+        }
+        return cookies;
+    }, {});
+}
+
+function encodeSignedPayload(payload) {
+    const encodedPayload = Buffer.from(JSON.stringify(payload), "utf8").toString("base64url");
+    const signature = crypto
+        .createHmac("sha256", CONFIG.sessionSecret)
+        .update(encodedPayload)
+        .digest("base64url");
+
+    return `${encodedPayload}.${signature}`;
+}
+
+function decodeSignedPayload(token) {
+    const value = String(token || "");
+    const separatorIndex = value.lastIndexOf(".");
+    if (separatorIndex === -1) {
+        return null;
+    }
+
+    const encodedPayload = value.slice(0, separatorIndex);
+    const signature = value.slice(separatorIndex + 1);
+    const expectedSignature = crypto
+        .createHmac("sha256", CONFIG.sessionSecret)
+        .update(encodedPayload)
+        .digest("base64url");
+
+    const receivedBuffer = Buffer.from(signature, "utf8");
+    const expectedBuffer = Buffer.from(expectedSignature, "utf8");
+    if (receivedBuffer.length !== expectedBuffer.length || !crypto.timingSafeEqual(receivedBuffer, expectedBuffer)) {
+        return null;
+    }
+
+    try {
+        return JSON.parse(Buffer.from(encodedPayload, "base64url").toString("utf8"));
+    } catch (error) {
+        return null;
+    }
+}
+
+function serializeCookie(name, value, options) {
+    const settings = options || {};
+    const parts = [`${name}=${encodeURIComponent(value)}`];
+
+    if (settings.maxAge != null) {
+        parts.push(`Max-Age=${Math.max(0, Number(settings.maxAge) || 0)}`);
+    }
+    if (settings.expires instanceof Date) {
+        parts.push(`Expires=${settings.expires.toUTCString()}`);
+    }
+
+    parts.push(`Path=${settings.path || "/"}`);
+    parts.push(`SameSite=${settings.sameSite || "Lax"}`);
+
+    if (settings.httpOnly !== false) {
+        parts.push("HttpOnly");
+    }
+
+    if (settings.secure) {
+        parts.push("Secure");
+    }
+
+    return parts.join("; ");
+}
+
+function createAdminSessionCookie(email) {
+    const token = encodeSignedPayload({
+        email,
+        issuedAt: new Date().toISOString()
+    });
+
+    return serializeCookie("admin_session", token, {
+        httpOnly: true,
+        maxAge: 60 * 60 * 8,
+        path: "/",
+        sameSite: "Lax",
+        secure: CONFIG.nodeEnv === "production"
+    });
+}
+
+function clearAdminSessionCookie() {
+    return serializeCookie("admin_session", "", {
+        httpOnly: true,
+        expires: new Date(0),
+        maxAge: 0,
+        path: "/",
+        sameSite: "Lax",
+        secure: CONFIG.nodeEnv === "production"
+    });
+}
+
+function getAdminSession(request) {
+    if (!isAdminConfigured()) {
+        return null;
+    }
+
+    const cookies = parseCookies(request);
+    const session = decodeSignedPayload(cookies.admin_session || "");
+    if (!session || session.email !== CONFIG.adminEmail) {
+        return null;
+    }
+
+    return session;
+}
+
+function passwordsMatch(left, right) {
+    const leftBuffer = Buffer.from(String(left || ""), "utf8");
+    const rightBuffer = Buffer.from(String(right || ""), "utf8");
+    if (leftBuffer.length !== rightBuffer.length) {
+        return false;
+    }
+
+    return crypto.timingSafeEqual(leftBuffer, rightBuffer);
+}
+
+function verifyStripeWebhookSignature(rawBody, signatureHeader) {
+    if (!CONFIG.stripeWebhookSecret) {
+        return;
+    }
+
+    const elements = String(signatureHeader || "")
+        .split(",")
+        .map((part) => part.trim())
+        .filter(Boolean);
+
+    let timestamp = "";
+    const signatures = [];
+
+    elements.forEach((element) => {
+        const separatorIndex = element.indexOf("=");
+        if (separatorIndex === -1) {
+            return;
+        }
+
+        const key = element.slice(0, separatorIndex).trim();
+        const value = element.slice(separatorIndex + 1).trim();
+
+        if (key === "t") {
+            timestamp = value;
+        } else if (key === "v1") {
+            signatures.push(value);
+        }
+    });
+
+    if (!timestamp || !signatures.length) {
+        throw new Error("Invalid Stripe-Signature header.");
+    }
+
+    const timestampNumber = Number.parseInt(timestamp, 10);
+    if (!Number.isFinite(timestampNumber)) {
+        throw new Error("Invalid Stripe webhook timestamp.");
+    }
+
+    const ageSeconds = Math.abs(Math.floor(Date.now() / 1000) - timestampNumber);
+    if (ageSeconds > 300) {
+        throw new Error("Stripe webhook timestamp is outside the allowed tolerance.");
+    }
+
+    const signedPayload = `${timestamp}.${rawBody.toString("utf8")}`;
+    const expectedSignature = crypto
+        .createHmac("sha256", CONFIG.stripeWebhookSecret)
+        .update(signedPayload, "utf8")
+        .digest("hex");
+
+    const expectedBuffer = Buffer.from(expectedSignature, "utf8");
+    const hasMatch = signatures.some((signature) => {
+        const receivedBuffer = Buffer.from(signature, "utf8");
+        return receivedBuffer.length === expectedBuffer.length
+            && crypto.timingSafeEqual(receivedBuffer, expectedBuffer);
+    });
+
+    if (!hasMatch) {
+        throw new Error("Stripe webhook signature verification failed.");
+    }
 }
 
 function normalizeShopDomain(input) {
@@ -446,7 +823,7 @@ function toShopifyDateTime(value, timeZoneOffset) {
 
     const offset = /^([+-]\d{2}:\d{2}|Z)$/.test(String(timeZoneOffset || "").trim())
         ? String(timeZoneOffset).trim()
-        : "+08:00";
+        : CONFIG.defaultTimeZoneOffset;
 
     return `${match[1]}T${match[2]}${offset}`;
 }
@@ -806,7 +1183,92 @@ function getJobPayload(job) {
 }
 
 async function handleApiRequest(request, response) {
-    const url = new URL(request.url, `http://${request.headers.host}`);
+    const requestOrigin = getRequestOrigin(request) || `http://${request.headers.host || `127.0.0.1:${PORT}`}`;
+    const url = new URL(request.url, requestOrigin);
+
+    if (request.method === "OPTIONS") {
+        response.writeHead(204, buildApiHeaders("text/plain; charset=utf-8", 0));
+        response.end();
+        return;
+    }
+
+    if (request.method === "GET" && url.pathname === "/api/health") {
+        sendJson(response, 200, {
+            ok: true,
+            status: "healthy",
+            appName: CONFIG.appName,
+            environment: CONFIG.nodeEnv,
+            publicBaseUrl: resolvePublicBaseUrl(request),
+            defaultApiBaseUrl: resolveDefaultApiBaseUrl(request)
+        });
+        return;
+    }
+
+    if (request.method === "GET" && url.pathname === "/api/config") {
+        sendJson(response, 200, {
+            ok: true,
+            config: buildRuntimeConfig(request)
+        });
+        return;
+    }
+
+    if (request.method === "POST" && url.pathname === "/api/admin/login") {
+        try {
+            if (!isAdminConfigured()) {
+                throw new Error("Set ADMIN_EMAIL and ADMIN_PASSWORD in .env or Render environment variables first.");
+            }
+
+            const payload = await readJsonBody(request);
+            const email = String(payload.email || "").trim();
+            const password = String(payload.password || "");
+            if (!email || !password) {
+                throw new Error("Email and password are required.");
+            }
+
+            if (email !== CONFIG.adminEmail || !passwordsMatch(password, CONFIG.adminPassword)) {
+                throw new Error("Invalid admin credentials.");
+            }
+
+            sendJson(response, 200, {
+                ok: true,
+                authenticated: true,
+                admin: {
+                    email: CONFIG.adminEmail
+                },
+                configStatus: buildAdminConfigStatus()
+            }, {
+                "Set-Cookie": createAdminSessionCookie(CONFIG.adminEmail)
+            });
+        } catch (error) {
+            sendJson(response, 401, {
+                ok: false,
+                error: error.message
+            });
+        }
+        return;
+    }
+
+    if (request.method === "POST" && url.pathname === "/api/admin/logout") {
+        sendJson(response, 200, {
+            ok: true,
+            authenticated: false
+        }, {
+            "Set-Cookie": clearAdminSessionCookie()
+        });
+        return;
+    }
+
+    if (request.method === "GET" && url.pathname === "/api/admin/session") {
+        const session = getAdminSession(request);
+        sendJson(response, 200, {
+            ok: true,
+            authenticated: Boolean(session),
+            admin: session ? { email: session.email } : null,
+            adminConfigured: isAdminConfigured(),
+            configStatus: session ? buildAdminConfigStatus() : null
+        });
+        return;
+    }
 
     if (request.method === "POST" && url.pathname === "/api/connect") {
         try {
@@ -906,6 +1368,7 @@ async function handleApiRequest(request, response) {
     if (request.method === "POST" && url.pathname === "/api/payments/webhook") {
         try {
             const rawBody = await readRawBody(request);
+            verifyStripeWebhookSignature(rawBody, request.headers["stripe-signature"]);
             const event = JSON.parse(rawBody.toString("utf8"));
             const eventType = String(event.type || "");
             if (eventType !== "checkout.session.completed" && eventType !== "payment_intent.succeeded") {
@@ -955,11 +1418,9 @@ async function handleApiRequest(request, response) {
 
         if (parts.length === 4 && parts[3] === "results.csv") {
             const csv = createImportResultsCsv(job.results);
-            response.writeHead(200, {
-                "Content-Type": "text/csv; charset=utf-8",
-                "Content-Disposition": `attachment; filename="${job.id}.shopify-import-results.csv"`,
-                "Content-Length": Buffer.byteLength(csv)
-            });
+            response.writeHead(200, buildApiHeaders("text/csv; charset=utf-8", Buffer.byteLength(csv), {
+                "Content-Disposition": `attachment; filename="${job.id}.shopify-import-results.csv"`
+            }));
             response.end(csv);
             return;
         }
@@ -1078,7 +1539,15 @@ async function handleApiRequest(request, response) {
 }
 
 function handleStaticRequest(request, response) {
-    const url = new URL(request.url, `http://${request.headers.host}`);
+    const requestOrigin = getRequestOrigin(request) || `http://${request.headers.host || `127.0.0.1:${PORT}`}`;
+    const url = new URL(request.url, requestOrigin);
+
+    if (url.pathname === "/app-config.js") {
+        sendText(response, 200, serializeRuntimeConfigScript(request), "application/javascript; charset=utf-8", {
+            "Cache-Control": "no-store"
+        });
+        return;
+    }
 
     const staticRoutes = {
         "/": "frontend_pages.html",
@@ -1087,6 +1556,7 @@ function handleStaticRequest(request, response) {
         "/woocommerce-migration": "woocommerce-migration.html",
         "/migration-tool": "odoo_matrixify_browser.html",
         "/admin": "admin_panel.html",
+        "/favicon.svg": "assets/img/favicon.svg",
         "/odoo_matrixify_converter.js": "odoo_matrixify_converter.js",
         "/home.html": "home.html",
         "/services.html": "services.html",
@@ -1096,7 +1566,7 @@ function handleStaticRequest(request, response) {
     };
 
     if (staticRoutes[url.pathname]) {
-        sendFile(response, path.join(__dirname, staticRoutes[url.pathname]));
+        sendFile(response, request, path.join(__dirname, staticRoutes[url.pathname]));
         return;
     }
 
@@ -1106,7 +1576,7 @@ function handleStaticRequest(request, response) {
             sendText(response, 403, "Forbidden");
             return;
         }
-        sendFile(response, htmlPath);
+        sendFile(response, request, htmlPath);
         return;
     }
 
@@ -1116,7 +1586,7 @@ function handleStaticRequest(request, response) {
             sendText(response, 403, "Forbidden");
             return;
         }
-        sendFile(response, assetPath);
+        sendFile(response, request, assetPath);
         return;
     }
 
@@ -1124,7 +1594,7 @@ function handleStaticRequest(request, response) {
 }
 
 const server = http.createServer((request, response) => {
-    if (request.url.startsWith("/api/")) {
+    if (request.url && request.url.startsWith("/api/")) {
         handleApiRequest(request, response).catch((error) => {
             sendJson(response, 500, {
                 ok: false,
@@ -1138,12 +1608,15 @@ const server = http.createServer((request, response) => {
 });
 
 server.listen(PORT, HOST, () => {
-    process.stdout.write(`Odoo Shopify sync app running at http://${HOST}:${PORT}\n`);
+    const localUrl = CONFIG.localApiBaseUrl || `http://127.0.0.1:${PORT}`;
+    const publicUrl = CONFIG.publicBaseUrl || CONFIG.renderExternalUrl || localUrl;
+    process.stdout.write(`${CONFIG.appName} running at ${publicUrl} (local: ${localUrl})\n`);
+    process.stdout.write(`Health check ready at ${publicUrl}/api/health\n`);
 });
 
 server.on("error", (error) => {
     if (error.code === "EADDRINUSE") {
-        process.stdout.write(`Port ${PORT} is already in use. Open http://${HOST}:${PORT}\n`);
+        process.stdout.write(`Port ${PORT} is already in use. Open ${CONFIG.localApiBaseUrl || `http://127.0.0.1:${PORT}`}\n`);
         process.exit(0);
         return;
     }

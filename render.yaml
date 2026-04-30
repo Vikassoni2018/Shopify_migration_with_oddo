@@ -1,10 +1,24 @@
 services:
   - type: web
-    name: shopify-migration-with-odoo
+    name: shopify-migration-with-oddo
     runtime: node
     plan: free
-    buildCommand: "npm install"
-    startCommand: "npm start"
+    buildCommand: npm install
+    startCommand: npm start
+    autoDeployTrigger: commit
+    healthCheckPath: /api/health
     envVars:
       - key: NODE_VERSION
         value: 20
+      - key: NODE_ENV
+        value: production
+      - key: APP_NAME
+        value: Shopify Migration with Odoo
+      - key: PUBLIC_BASE_URL
+        value: https://shopify-migration-with-oddo.onrender.com
+      - key: DEFAULT_API_BASE_URL
+        value: https://shopify-migration-with-oddo.onrender.com
+      - key: DEFAULT_TIMEZONE_OFFSET
+        value: +08:00
+      - key: APP_SESSION_SECRET
+        generateValue: true

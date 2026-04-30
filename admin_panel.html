@@ -1,14 +1,485 @@
-<!doctype html><html><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><title>Admin Panel</title><style>body{font-family:Arial;background:#f5f6fa;margin:0}.wrap{max-width:760px;margin:26px auto;padding:0 16px}.card{background:#fff;border-radius:10px;padding:18px;box-shadow:0 2px 8px rgba(0,0,0,.08);margin-bottom:14px}input{width:100%;padding:10px;margin:6px 0 10px;border:1px solid #ccc;border-radius:8px}button{padding:10px 14px;border:0;background:#0a3d62;color:#fff;border-radius:8px;cursor:pointer}.hidden{display:none}</style></head><body><div class='wrap'>
-<div id='login' class='card'><h2>Admin Login</h2><input id='email' placeholder='Email'><input id='password' type='password' placeholder='Password'><button onclick='login()'>Login</button><p id='msg'></p></div>
-<div id='panel' class='hidden'>
-<div class='card'><h2>Dashboard</h2><p>Welcome to admin dashboard for migration management.</p></div>
-<div class='card'><h2>Payment Setting</h2><label>Stripe Publishable Key</label><input id='pk' placeholder='pk_live_...'><label>Stripe Secret Key</label><input id='sk' placeholder='sk_live_...'><button onclick='saveKeys()'>Save Stripe Keys</button><p id='saved'></p></div>
-<div class='card'><button onclick='logout()'>Logout</button></div></div></div>
-<script>
-const ADMIN_EMAIL='vikassoni2018@gmail.com';const ADMIN_PASSWORD='Admin@123';
-if(localStorage.getItem('admin_auth')==='1'){showPanel();}
-function login(){const e=document.getElementById('email').value.trim();const p=document.getElementById('password').value;document.getElementById('msg').textContent=(e===ADMIN_EMAIL&&p===ADMIN_PASSWORD)?(localStorage.setItem('admin_auth','1'),'Login successful'): 'Invalid credentials';if(e===ADMIN_EMAIL&&p===ADMIN_PASSWORD)showPanel();}
-function showPanel(){document.getElementById('login').classList.add('hidden');document.getElementById('panel').classList.remove('hidden');document.getElementById('pk').value=localStorage.getItem('stripe_pk')||'';document.getElementById('sk').value=localStorage.getItem('stripe_sk')||'';}
-function saveKeys(){localStorage.setItem('stripe_pk',document.getElementById('pk').value.trim());localStorage.setItem('stripe_sk',document.getElementById('sk').value.trim());document.getElementById('saved').textContent='Stripe keys updated.';}
-function logout(){localStorage.removeItem('admin_auth');location.reload();}
-</script></body></html>
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Deployment Admin</title>
+    <style>
+        :root {
+            --bg: #f4efe7;
+            --panel: rgba(255, 251, 246, 0.92);
+            --ink: #1f2933;
+            --muted: #6b7280;
+            --accent: #0f766e;
+            --accent-soft: rgba(15, 118, 110, 0.12);
+            --line: rgba(31, 41, 51, 0.1);
+            --danger: #b42318;
+            --success: #15803d;
+            --shadow: 0 24px 60px rgba(31, 41, 51, 0.12);
+            --radius: 24px;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            font-family: "Aptos", "Segoe UI", sans-serif;
+            color: var(--ink);
+            background:
+                radial-gradient(circle at top left, rgba(238, 155, 0, 0.18), transparent 24%),
+                radial-gradient(circle at top right, rgba(15, 118, 110, 0.16), transparent 22%),
+                linear-gradient(145deg, #f8f4ee 0%, #ebe0cf 100%);
+            padding: 32px 18px 48px;
+        }
+
+        .shell {
+            max-width: 1040px;
+            margin: 0 auto;
+        }
+
+        .hero,
+        .panel,
+        .notice {
+            background: var(--panel);
+            border: 1px solid rgba(255, 255, 255, 0.6);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+            backdrop-filter: blur(16px);
+        }
+
+        .hero {
+            padding: 28px;
+            margin-bottom: 20px;
+        }
+
+        .eyebrow {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 12px;
+            border-radius: 999px;
+            background: var(--accent-soft);
+            color: var(--accent);
+            font-size: 13px;
+            font-weight: 700;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+        }
+
+        h1, h2 {
+            margin: 0;
+        }
+
+        h1 {
+            margin-top: 16px;
+            font-size: clamp(2rem, 4vw, 3.3rem);
+            line-height: 0.98;
+            letter-spacing: -0.03em;
+            font-family: Georgia, "Times New Roman", serif;
+        }
+
+        .hero p,
+        .panel p,
+        .notice p {
+            color: var(--muted);
+            line-height: 1.6;
+        }
+
+        .layout {
+            display: grid;
+            grid-template-columns: 360px 1fr;
+            gap: 20px;
+            align-items: start;
+        }
+
+        .panel,
+        .notice {
+            padding: 24px;
+        }
+
+        .field {
+            display: grid;
+            gap: 8px;
+            margin-top: 16px;
+        }
+
+        label {
+            font-size: 0.92rem;
+            font-weight: 700;
+        }
+
+        input {
+            width: 100%;
+            border: 1px solid rgba(31, 41, 51, 0.12);
+            border-radius: 14px;
+            padding: 12px 14px;
+            font: inherit;
+            background: rgba(255, 255, 255, 0.86);
+            color: var(--ink);
+        }
+
+        .actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            margin-top: 18px;
+        }
+
+        button {
+            appearance: none;
+            border: 0;
+            border-radius: 999px;
+            padding: 12px 18px;
+            font: inherit;
+            font-weight: 700;
+            cursor: pointer;
+        }
+
+        .primary {
+            background: linear-gradient(135deg, #0f766e, #0ea5a4);
+            color: white;
+        }
+
+        .secondary {
+            background: white;
+            color: var(--ink);
+            border: 1px solid var(--line);
+        }
+
+        .status {
+            min-height: 24px;
+            margin-top: 14px;
+            font-size: 0.95rem;
+            font-weight: 700;
+        }
+
+        .status.ok {
+            color: var(--success);
+        }
+
+        .status.error {
+            color: var(--danger);
+        }
+
+        .status.info {
+            color: var(--accent);
+        }
+
+        .meta {
+            margin-top: 18px;
+            border-radius: 18px;
+            border: 1px solid var(--line);
+            background: rgba(255, 255, 255, 0.72);
+            padding: 14px 16px;
+        }
+
+        .meta strong {
+            display: block;
+            margin-bottom: 4px;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 14px;
+            margin-top: 18px;
+        }
+
+        .stat {
+            border-radius: 18px;
+            border: 1px solid var(--line);
+            background: rgba(255, 255, 255, 0.76);
+            padding: 16px;
+        }
+
+        .stat strong {
+            display: block;
+            margin-bottom: 8px;
+            font-size: 1rem;
+        }
+
+        .chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 7px 12px;
+            border-radius: 999px;
+            font-size: 0.84rem;
+            font-weight: 700;
+        }
+
+        .chip.ok {
+            background: rgba(21, 128, 61, 0.12);
+            color: var(--success);
+        }
+
+        .chip.off {
+            background: rgba(180, 35, 24, 0.1);
+            color: var(--danger);
+        }
+
+        .detail {
+            margin-top: 10px;
+            color: var(--muted);
+            font-size: 0.94rem;
+            line-height: 1.5;
+            word-break: break-word;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        @media (max-width: 900px) {
+            .layout,
+            .grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="shell">
+        <section class="hero">
+            <span class="eyebrow">Render-ready admin</span>
+            <h1>Environment-backed deployment controls for local and Render.</h1>
+            <p>This panel now reads runtime settings from the server instead of storing secrets in the browser. Use <code>.env</code> locally, and use Render environment variables for production.</p>
+        </section>
+
+        <section class="layout">
+            <div class="panel">
+                <h2>Admin Access</h2>
+                <p>Sign in with the admin credentials configured on the server.</p>
+                <div class="field">
+                    <label for="email">Admin email</label>
+                    <input id="email" type="email" placeholder="admin@example.com" autocomplete="username">
+                </div>
+                <div class="field">
+                    <label for="password">Password</label>
+                    <input id="password" type="password" placeholder="Enter admin password" autocomplete="current-password">
+                </div>
+                <div class="actions" id="loginActions">
+                    <button class="primary" id="loginButton" type="button">Sign In</button>
+                </div>
+                <div class="actions hidden" id="sessionActions">
+                    <button class="secondary" id="logoutButton" type="button">Sign Out</button>
+                </div>
+                <div class="meta" id="authMeta">
+                    <strong>Session inactive</strong>
+                    <span>This page becomes fully useful after <code>ADMIN_EMAIL</code> and <code>ADMIN_PASSWORD</code> are configured.</span>
+                </div>
+                <div class="status" id="statusMessage"></div>
+            </div>
+
+            <div>
+                <div class="panel hidden" id="configPanel">
+                    <h2>Runtime Configuration</h2>
+                    <p>Secrets remain server-side. This page only shows deployment status and safe previews.</p>
+                    <div class="grid" id="configGrid"></div>
+                </div>
+
+                <div class="notice">
+                    <h2>How to manage settings</h2>
+                    <p>For local work, edit <code>.env</code> in the project root. For Render, keep secrets in the service environment variables and leave this panel read-only.</p>
+                    <p>That matches Render’s deployment model better, because the app filesystem is ephemeral and browser storage is not a safe place for admin secrets or Stripe keys.</p>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <script>
+        (function () {
+            var emailInput = document.getElementById("email");
+            var passwordInput = document.getElementById("password");
+            var loginButton = document.getElementById("loginButton");
+            var logoutButton = document.getElementById("logoutButton");
+            var loginActions = document.getElementById("loginActions");
+            var sessionActions = document.getElementById("sessionActions");
+            var authMeta = document.getElementById("authMeta");
+            var statusMessage = document.getElementById("statusMessage");
+            var configPanel = document.getElementById("configPanel");
+            var configGrid = document.getElementById("configGrid");
+            var runtimeConfig = window.APP_CONFIG || {};
+
+            function setStatus(message, tone) {
+                statusMessage.textContent = message || "";
+                statusMessage.className = "status" + (tone ? " " + tone : "");
+            }
+
+            async function requestJson(url, options) {
+                var response = await fetch(url, Object.assign({
+                    headers: {
+                        "Content-Type": "application/json"
+                    }
+                }, options || {}));
+                var data = await response.json().catch(function () {
+                    return {};
+                });
+
+                if (!response.ok || data.ok === false) {
+                    throw new Error(data.error || "Request failed.");
+                }
+
+                return data;
+            }
+
+            function createStatusChip(enabled, text) {
+                return "<span class=\"chip " + (enabled ? "ok" : "off") + "\">" + text + "</span>";
+            }
+
+            function renderConfigStatus(configStatus) {
+                if (!configStatus) {
+                    configGrid.innerHTML = "";
+                    configPanel.classList.add("hidden");
+                    return;
+                }
+
+                var cards = [
+                    {
+                        title: "Environment",
+                        chip: createStatusChip(true, configStatus.environment || "development"),
+                        detail: "App name: " + (configStatus.appName || runtimeConfig.appName || "Shopify Migration with Odoo")
+                    },
+                    {
+                        title: "Public base URL",
+                        chip: createStatusChip(Boolean(configStatus.publicBaseUrl), configStatus.publicBaseUrl ? "Configured" : "Missing"),
+                        detail: configStatus.publicBaseUrl || runtimeConfig.publicBaseUrl || "No public base URL configured yet."
+                    },
+                    {
+                        title: "Default API base",
+                        chip: createStatusChip(Boolean(configStatus.defaultApiBaseUrl), configStatus.defaultApiBaseUrl ? "Configured" : "Missing"),
+                        detail: configStatus.defaultApiBaseUrl || runtimeConfig.defaultApiBaseUrl || window.location.origin
+                    },
+                    {
+                        title: "Default order timezone",
+                        chip: createStatusChip(Boolean(configStatus.defaultTimeZoneOffset), configStatus.defaultTimeZoneOffset || "Unset"),
+                        detail: "Used for imported order timestamps when the page does not provide a custom override."
+                    },
+                    {
+                        title: "Stripe publishable key",
+                        chip: createStatusChip(configStatus.stripePublishableKeyConfigured, configStatus.stripePublishableKeyConfigured ? "Configured" : "Missing"),
+                        detail: configStatus.stripePublishableKeyPreview || "Set STRIPE_PUBLISHABLE_KEY in .env or Render."
+                    },
+                    {
+                        title: "Stripe secret key",
+                        chip: createStatusChip(configStatus.stripeSecretKeyConfigured, configStatus.stripeSecretKeyConfigured ? "Configured" : "Missing"),
+                        detail: "The raw secret is intentionally never returned to the browser."
+                    },
+                    {
+                        title: "Stripe webhook secret",
+                        chip: createStatusChip(configStatus.stripeWebhookSecretConfigured, configStatus.stripeWebhookSecretConfigured ? "Configured" : "Missing"),
+                        detail: "If present, the webhook endpoint verifies the Stripe signature before accepting events."
+                    },
+                    {
+                        title: "Admin login",
+                        chip: createStatusChip(configStatus.adminConfigured, configStatus.adminConfigured ? "Configured" : "Missing"),
+                        detail: configStatus.adminEmail || "Set ADMIN_EMAIL and ADMIN_PASSWORD to enable server-backed admin access."
+                    }
+                ];
+
+                configGrid.innerHTML = cards.map(function (card) {
+                    return [
+                        "<article class=\"stat\">",
+                        "<strong>" + card.title + "</strong>",
+                        card.chip,
+                        "<div class=\"detail\">" + card.detail + "</div>",
+                        "</article>"
+                    ].join("");
+                }).join("");
+
+                configPanel.classList.remove("hidden");
+            }
+
+            function renderAuthState(sessionData) {
+                var authenticated = Boolean(sessionData && sessionData.authenticated);
+                loginActions.classList.toggle("hidden", authenticated);
+                sessionActions.classList.toggle("hidden", !authenticated);
+                emailInput.disabled = authenticated;
+                passwordInput.disabled = authenticated;
+
+                if (authenticated) {
+                    authMeta.innerHTML = "<strong>Signed in as " + (sessionData.admin && sessionData.admin.email ? sessionData.admin.email : "admin") + "</strong><span>Environment values are being read from the server runtime.</span>";
+                    renderConfigStatus(sessionData.configStatus || null);
+                } else {
+                    var readyText = sessionData && sessionData.adminConfigured
+                        ? "Server-side admin credentials are configured. Sign in to view deployment status."
+                        : "Set ADMIN_EMAIL and ADMIN_PASSWORD in .env or Render first, then reload this page.";
+                    authMeta.innerHTML = "<strong>Session inactive</strong><span>" + readyText + "</span>";
+                    renderConfigStatus(null);
+                }
+            }
+
+            async function refreshSession() {
+                try {
+                    var sessionData = await requestJson("/api/admin/session", {
+                        method: "GET"
+                    });
+                    renderAuthState(sessionData);
+                    if (!sessionData.authenticated) {
+                        setStatus(sessionData.adminConfigured ? "Sign in to inspect the deployment configuration." : "Admin credentials are not configured on the server yet.", "info");
+                    } else {
+                        setStatus("Admin session is active.", "ok");
+                    }
+                } catch (error) {
+                    renderAuthState({ authenticated: false, adminConfigured: false, configStatus: null });
+                    setStatus(error.message, "error");
+                }
+            }
+
+            async function login() {
+                loginButton.disabled = true;
+                setStatus("Signing in...", "info");
+
+                try {
+                    var data = await requestJson("/api/admin/login", {
+                        method: "POST",
+                        body: JSON.stringify({
+                            email: emailInput.value,
+                            password: passwordInput.value
+                        })
+                    });
+                    passwordInput.value = "";
+                    renderAuthState(data);
+                    setStatus("Signed in successfully.", "ok");
+                } catch (error) {
+                    renderAuthState({ authenticated: false, adminConfigured: true, configStatus: null });
+                    setStatus(error.message, "error");
+                } finally {
+                    loginButton.disabled = false;
+                }
+            }
+
+            async function logout() {
+                logoutButton.disabled = true;
+                setStatus("Signing out...", "info");
+
+                try {
+                    await requestJson("/api/admin/logout", {
+                        method: "POST",
+                        body: JSON.stringify({})
+                    });
+                    renderAuthState({ authenticated: false, adminConfigured: true, configStatus: null });
+                    setStatus("Signed out.", "ok");
+                } catch (error) {
+                    setStatus(error.message, "error");
+                } finally {
+                    logoutButton.disabled = false;
+                }
+            }
+
+            loginButton.addEventListener("click", login);
+            logoutButton.addEventListener("click", logout);
+            passwordInput.addEventListener("keydown", function (event) {
+                if (event.key === "Enter") {
+                    login();
+                }
+            });
+
+            refreshSession();
+        }());
+    </script>
+</body>
+</html>

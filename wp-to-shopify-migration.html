@@ -64,6 +64,7 @@
   </div>
 </section>
 <script>
+const appConfig = window.APP_CONFIG || {};
 const mapping = [
 ['Name','Title','Direct'],['Description','Body (HTML)','Direct'],['Short description','SEO Description','Fallback'],['SKU','Variant SKU','Direct'],['Regular price','Variant Compare At Price','Direct'],['Sale price','Variant Price','Fallback to Regular price'],['Stock','Variant Inventory Qty','Numeric'],['Categories','Type','First category'],['Tags','Tags','Direct'],['Images','Image Src','First image'],['Weight (kg)','Variant Grams','kg→grams'],['Published','Published','yes/1→TRUE'],['Attribute 1 name','Option1 Name','Direct'],['Attribute 1 value(s)','Option1 Value','Direct'],['Attribute 2 name','Option2 Name','Direct'],['Attribute 2 value(s)','Option2 Value','Direct'],['Attribute 3 name','Option3 Name','Direct'],['Attribute 3 value(s)','Option3 Value','Direct'],['Slug','Handle','fallback from Name'],['Meta: _yoast_wpseo_title','SEO Title','Direct']
 ];
@@ -81,6 +82,11 @@ function parseCSV(text){
   if(cell.length||row.length){row.push(cell);rows.push(row);}return rows;
 }
 function csvEscape(v){const s=String(v??'');return /[",\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s;}
+function buildApiUrl(path){
+  const cleanPath = path.startsWith('/') ? path : ('/' + path);
+  const base = String(appConfig.defaultApiBaseUrl || window.location.origin || '').trim().replace(/\/+$/,'');
+  return base ? (base + cleanPath) : cleanPath;
+}
 function wcToShopifyRow(w){
   const handle=(w['Slug']||w['Name']||'product').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');
   return {
@@ -111,11 +117,15 @@ document.getElementById('syncBtn').onclick=async()=>{
   const domain=document.getElementById('shopDomain').value.trim();
   const token=document.getElementById('accessToken').value.trim();
   const f=document.getElementById('syncCsvFile').files[0]; if(!domain||!token||!f)return alert('Enter domain, token, and CSV file');
-  const t=await f.text(); const rows=parseCSV(t); const headers=rows[0]||[];
-  const products=rows.slice(1).filter(r=>r.some(v=>String(v).trim())).map(r=>Object.fromEntries(headers.map((h,i)=>[h,r[i]||''])));
-  const res=await fetch('/api/products/sync',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({shopDomain:domain,accessToken:token,products})});
-  const data=await res.json();
-  document.getElementById('syncLog').textContent = data.ok ? `Sync done. Created: ${data.summary.created}, Updated: ${data.summary.updated}, Failed: ${data.summary.failed}` : `Error: ${data.error}`;
+  try{
+    const t=await f.text(); const rows=parseCSV(t); const headers=rows[0]||[];
+    const products=rows.slice(1).filter(r=>r.some(v=>String(v).trim())).map(r=>Object.fromEntries(headers.map((h,i)=>[h,r[i]||''])));
+    const res=await fetch(buildApiUrl('/api/products/sync'),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({shopDomain:domain,accessToken:token,products})});
+    const data=await res.json();
+    document.getElementById('syncLog').textContent = data.ok ? `Sync done. Created: ${data.summary.created}, Updated: ${data.summary.updated}, Failed: ${data.summary.failed}` : `Error: ${data.error}`;
+  }catch(error){
+    document.getElementById('syncLog').textContent = `Error: ${error.message}`;
+  }
 }
 </script>
 </body>

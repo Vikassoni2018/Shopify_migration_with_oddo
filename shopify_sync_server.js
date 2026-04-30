@@ -100,7 +100,9 @@ function sendFile(response, filePath) {
             ? "application/javascript; charset=utf-8"
             : extension === ".css"
                 ? "text/css; charset=utf-8"
-                : "application/octet-stream";
+                : extension === ".svg"
+                    ? "image/svg+xml"
+                    : "application/octet-stream";
 
     fs.readFile(filePath, (error, buffer) => {
         if (error) {
@@ -918,6 +920,16 @@ function handleStaticRequest(request, response) {
 
     if (url.pathname === "/odoo_matrixify_converter.js") {
         sendFile(response, path.join(__dirname, "odoo_matrixify_converter.js"));
+        return;
+    }
+
+    if (url.pathname.startsWith("/assets/")) {
+        const assetPath = path.normalize(path.join(__dirname, url.pathname));
+        if (!assetPath.startsWith(path.join(__dirname, "assets"))) {
+            sendText(response, 403, "Forbidden");
+            return;
+        }
+        sendFile(response, assetPath);
         return;
     }
 

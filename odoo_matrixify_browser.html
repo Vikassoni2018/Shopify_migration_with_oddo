@@ -648,6 +648,10 @@
                         <label for="wooAccessToken">Shopify Admin API token</label>
                         <input id="wooAccessToken" type="password" placeholder="shpat_...">
                     </div>
+                    <div class="field">
+                        <label for="wooApiBase">Sync API base URL (optional)</label>
+                        <input id="wooApiBase" type="text" placeholder="https://your-render-app.onrender.com">
+                    </div>
                     <div class="field field-full">
                         <label class="dropzone" id="wooDropzone">
                             <input class="file-input" id="wooFileInput" type="file" accept=".csv,text/csv">
@@ -756,6 +760,7 @@
             var syncWooButton = document.getElementById("syncWooButton");
             var wooStatus = document.getElementById("wooStatus");
             var wooFieldBody = document.getElementById("wooFieldBody");
+            var wooApiBaseInput = document.getElementById("wooApiBase");
 
             var selectedFile = null;
             var previewResult = null;
@@ -830,12 +835,31 @@
                 }, 1000);
             }
 
+
+            function getApiBase() {
+                var base = (wooApiBaseInput && wooApiBaseInput.value ? wooApiBaseInput.value : "").trim();
+                if (!base) {
+                    base = window.localStorage.getItem("wooApiBase") || "";
+                }
+                if (!base) {
+                    return "";
+                }
+                return base.replace(/\/+$/, "");
+            }
+
+            function toApiUrl(path) {
+                var cleanPath = path.charAt(0) === "/" ? path : ("/" + path);
+                var base = getApiBase();
+                return base ? (base + cleanPath) : cleanPath;
+            }
+
             async function postJson(url, payload) {
                 var response;
                 var data;
 
                 try {
-                    response = await fetch(url, {
+                    var requestUrl = toApiUrl(url);
+                    response = await fetch(requestUrl, {
                         method: "POST",
                         headers: {
                             "Content-Type": "application/json"
@@ -843,7 +867,7 @@
                         body: JSON.stringify(payload)
                     });
                 } catch (error) {
-                    throw new Error("Cannot reach the local sync server. Open the app from Open_Odoo_CSV_Converter.bat and make sure the browser URL is http://127.0.0.1:3456.");
+                    throw new Error("Cannot reach the sync server. If hosted on Render, set \"Sync API base URL\" to your Render URL (for example https://your-app.onrender.com). For local mode use http://127.0.0.1:3456.");
                 }
 
                 try {
@@ -863,9 +887,10 @@
                 var data;
 
                 try {
-                    response = await fetch(url);
+                    var requestUrl = toApiUrl(url);
+                    response = await fetch(requestUrl);
                 } catch (error) {
-                    throw new Error("Cannot reach the local sync server. Open the app from Open_Odoo_CSV_Converter.bat and make sure the browser URL is http://127.0.0.1:3456.");
+                    throw new Error("Cannot reach the sync server. If hosted on Render, set \"Sync API base URL\" to your Render URL (for example https://your-app.onrender.com). For local mode use http://127.0.0.1:3456.");
                 }
 
                 try {
@@ -1406,8 +1431,15 @@
                 if (!currentJobId) {
                     return;
                 }
-                window.location.href = "/api/jobs/" + encodeURIComponent(currentJobId) + "/results.csv";
+                window.location.href = toApiUrl("/api/jobs/" + encodeURIComponent(currentJobId) + "/results.csv");
             });
+
+            if (wooApiBaseInput) {
+                wooApiBaseInput.value = window.localStorage.getItem("wooApiBase") || "";
+                wooApiBaseInput.addEventListener("input", function () {
+                    window.localStorage.setItem("wooApiBase", wooApiBaseInput.value.trim());
+                });
+            }
 
             renderConnection();
             updateFileMeta();

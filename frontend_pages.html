@@ -1,45 +1,235 @@
 <!doctype html>
-<html lang='en'>
+<html lang="en">
 <head>
-  <meta charset='utf-8'>
-  <meta name='viewport' content='width=device-width,initial-scale=1'>
-  <title>Migration Portal | Odoo & WooCommerce</title>
-  <meta name='description' content='Choose your migration path. Dedicated pages for Odoo and WooCommerce workflows with separate tools and instructions.'>
-  <link rel='stylesheet' href='/assets/css/frontend.css'>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Shopify Migration with Odoo</title>
+  <meta name="description" content="Premium migration platform for moving Odoo and WooCommerce data into Shopify with direct imports, CSV preparation, admin controls, and payment-ready workflows.">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/assets/css/saas-platform.css">
+  <script src="/assets/js/saas-platform.js" defer></script>
 </head>
-<body>
-<div class='topbar'>Migration Portal rebuilt with dedicated pages for each platform.</div>
-<header class='header'><div class='brand'>Migration Portal</div><nav class='nav'><a href='/'>Home</a><a href='/odoo-migration'>Odoo Migration</a><a href='/woocommerce-migration'>WooCommerce Migration</a><a href='/admin'>Admin Panel</a></nav></header>
+<body class="platform-body">
+  <div class="top-banner">Production-ready migration workspace for Odoo and WooCommerce to Shopify.</div>
 
-<section class='hero'>
-  <div class='hero-inner'>
-    <h1>Pick Your Migration Workflow</h1>
-    <p>Your project now has separate, clean pages for Odoo-to-Shopify and WooCommerce migration services so users do not hit broken routes.</p>
-    <div class='hero-actions'>
-      <a class='btn btn-primary' href='/odoo-migration'>Open Odoo Flow</a>
-      <a class='btn btn-light' href='/woocommerce-migration'>Open WooCommerce Flow</a>
-    </div>
-  </div>
-</section>
+  <header class="site-header">
+    <div class="site-header-inner">
+      <a class="brand" href="/">
+        <span class="brand-mark">SM</span>
+        <span class="brand-copy">
+          <strong>ShopifyMigrate</strong>
+          <span>Data migration with import controls</span>
+        </span>
+      </a>
 
-<section class='container'>
-  <h2 class='section-title'>Platform-specific pages</h2>
-  <div class='grid grid-3'>
-    <div class='item'>
-      <h3>Odoo Migration Page</h3>
-      <p>Use the built-in converter and Shopify import flow for Odoo exports.</p>
-      <a class='btn btn-light' href='/odoo-migration'>Go to Odoo Page</a>
+      <nav class="site-nav" aria-label="Primary">
+        <div class="site-nav-links">
+          <a href="/" data-route="/">Home</a>
+          <a href="/pricing" data-route="/pricing">Pricing</a>
+          <a href="/help" data-route="/help">Help</a>
+          <a href="/dashboard" data-route="/dashboard" data-route-prefix>Dashboard</a>
+          <a href="/admin" data-route="/admin" data-route-prefix>Admin</a>
+        </div>
+        <div class="site-nav-cta">
+          <a class="button-link secondary" href="/login">Log in</a>
+          <a class="button-link primary" href="/signup">Get Started</a>
+        </div>
+        <button class="nav-toggle" type="button" aria-label="Open menu" aria-expanded="false" data-nav-toggle>☰</button>
+      </nav>
     </div>
-    <div class='item'>
-      <h3>WooCommerce Migration Page</h3>
-      <p>Use separated service details and process guidance for WooCommerce migration.</p>
-      <a class='btn btn-light' href='/woocommerce-migration'>Go to WooCommerce Page</a>
+
+    <div class="mobile-nav" data-mobile-nav>
+      <div class="mobile-nav-inner">
+        <a href="/" data-route="/">Home</a>
+        <a href="/pricing" data-route="/pricing">Pricing</a>
+        <a href="/help" data-route="/help">Help</a>
+        <a href="/dashboard" data-route="/dashboard">Dashboard</a>
+        <a href="/admin" data-route="/admin">Admin</a>
+        <div class="nav-actions">
+          <a class="button-link secondary" href="/login">Log in</a>
+          <a class="button-link primary" href="/signup">Get Started</a>
+        </div>
+      </div>
     </div>
-    <div class='item'>
-      <h3>Legacy Navigation Fixed</h3>
-      <p>Old pages like /home.html and /services.html now load instead of returning Not Found.</p>
+  </header>
+
+  <main class="page-shell">
+    <section class="page-hero">
+      <article class="page-hero-main">
+        <span class="eyebrow">Migration SaaS</span>
+        <h1 class="hero-title">Move products, orders, customers, and images into Shopify with confidence.</h1>
+        <p class="hero-copy">This platform combines your Odoo Matrixify workflow, direct WooCommerce product import, environment-aware deployment, payment preparation, and admin controls in one Render-ready project.</p>
+        <div class="hero-actions">
+          <a class="button-link primary" href="/odoo-migration">Open Odoo Flow</a>
+          <a class="button-link secondary" href="/woocommerce-migration">Open WooCommerce Flow</a>
+          <a class="button-link ghost" href="/pricing">View Pricing</a>
+        </div>
+
+        <div class="hero-metrics">
+          <div class="metric-card">
+            <span class="metric-value">CSV + API</span>
+            <span class="metric-label">Prepare files or import straight into Shopify.</span>
+          </div>
+          <div class="metric-card">
+            <span class="metric-value">Render Ready</span>
+            <span class="metric-label">Local `.env` and production base URL support built in.</span>
+          </div>
+          <div class="metric-card">
+            <span class="metric-value">Admin Safe</span>
+            <span class="metric-label">Server-backed sessions and environment-driven controls.</span>
+          </div>
+        </div>
+      </article>
+
+      <aside class="page-hero-side">
+        <span class="eyebrow inverse">Live workspace</span>
+        <h2 class="card-title">What this project now covers</h2>
+        <ul class="detail-list">
+          <li>Odoo order migration with Matrixify-compatible preparation and Shopify import jobs.</li>
+          <li>WooCommerce product migration with direct Shopify product creation and image URL import.</li>
+          <li>Payment-ready quote flow for free, per-1000, and full-migration plans.</li>
+          <li>Admin panel with environment status, store entitlements, jobs, and payment activity.</li>
+        </ul>
+        <div class="status-row">
+          <span class="badge inverse">Local and Render aware</span>
+          <span class="badge inverse">Single Node server</span>
+        </div>
+      </aside>
+    </section>
+
+    <section class="page-section panel">
+      <div class="section-heading">
+        <span class="eyebrow">Why this setup</span>
+        <h2 class="section-title">The design system now wraps the real migration flows.</h2>
+        <p class="section-subtitle">Instead of a disconnected mockup, the public site, dashboard pages, admin workspace, and migration routes share one visual language while your existing backend endpoints keep handling uploads, previews, imports, and runtime config.</p>
+      </div>
+
+      <div class="content-grid cols-3">
+        <article class="icon-card">
+          <span class="icon-badge">01</span>
+          <div>
+            <h3 class="card-title">Choose a source</h3>
+            <p class="card-copy">Launch the Odoo or WooCommerce flow from a dedicated route with its own focused workflow.</p>
+          </div>
+        </article>
+        <article class="icon-card">
+          <span class="icon-badge">02</span>
+          <div>
+            <h3 class="card-title">Prepare and validate</h3>
+            <p class="card-copy">Upload CSV exports, preview field mapping, review warnings, and download transformed data when needed.</p>
+          </div>
+        </article>
+        <article class="icon-card">
+          <span class="icon-badge">03</span>
+          <div>
+            <h3 class="card-title">Import or monitor</h3>
+            <p class="card-copy">Send data directly to Shopify, track jobs, and use the admin area for environment and activity visibility.</p>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section class="page-section content-grid cols-3">
+      <article class="panel">
+        <span class="badge primary">Odoo</span>
+        <h3 class="card-title">Matrixify-compatible order workflow</h3>
+        <p class="card-copy">Use the Odoo workspace to upload exports, generate `Orders.csv`, download mapping files, connect Shopify, and run tracked import jobs.</p>
+        <div class="button-row">
+          <a class="button-link primary" href="/odoo-migration">Open Odoo Migration</a>
+        </div>
+      </article>
+
+      <article class="panel">
+        <span class="badge success">WooCommerce</span>
+        <h3 class="card-title">Direct product import with images</h3>
+        <p class="card-copy">Prepare Shopify-ready product CSV output or import directly into Shopify products using the Admin API and image URLs from the WooCommerce export.</p>
+        <div class="button-row">
+          <a class="button-link primary" href="/woocommerce-migration">Open WooCommerce Migration</a>
+        </div>
+      </article>
+
+      <article class="panel">
+        <span class="badge warning">Operations</span>
+        <h3 class="card-title">Admin, jobs, payments, and runtime config</h3>
+        <p class="card-copy">Manage environment-backed access, inspect recent jobs, review store entitlements, and verify deployment readiness for local and Render hosting.</p>
+        <div class="button-row">
+          <a class="button-link primary" href="/admin">Open Admin Panel</a>
+        </div>
+      </article>
+    </section>
+
+    <section class="page-section split-panel">
+      <div class="split-panel-copy">
+        <span class="eyebrow inverse">Payment flow</span>
+        <h2 class="section-title">Free trial, per-1000, and full unlock.</h2>
+        <p class="muted">The project already includes pricing constants, order quota logic, quote generation, and Stripe webhook handling. The new pages expose that flow more clearly so users understand when free migration ends and paid entitlements begin.</p>
+        <ul class="check-list">
+          <li>Free up to 10 orders</li>
+          <li>$10 per additional 1,000 orders</li>
+          <li>$100 full migration unlock</li>
+        </ul>
+      </div>
+      <div class="split-panel-body">
+        <div class="content-grid cols-2">
+          <article class="icon-card">
+            <span class="icon-badge">Q</span>
+            <div>
+              <h3 class="card-title">Quote calculator</h3>
+              <p class="card-copy">Generate payment guidance directly from order count using the checkout quote endpoint.</p>
+            </div>
+          </article>
+          <article class="icon-card">
+            <span class="icon-badge">S</span>
+            <div>
+              <h3 class="card-title">Success and failure states</h3>
+              <p class="card-copy">Dedicated confirmation pages keep the whole payment experience consistent with the rest of the platform.</p>
+            </div>
+          </article>
+        </div>
+        <div class="button-row">
+          <a class="button-link primary" href="/pricing">Explore plans</a>
+          <a class="button-link secondary" href="/checkout">Open checkout page</a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="site-footer-inner">
+      <div class="site-footer-grid">
+        <div>
+          <a class="brand" href="/">
+            <span class="brand-mark">SM</span>
+            <span class="brand-copy">
+              <strong>ShopifyMigrate</strong>
+              <span>Migration, imports, and admin control in one app.</span>
+            </span>
+          </a>
+        </div>
+        <div class="footer-links">
+          <strong>Product</strong>
+          <a href="/odoo-migration">Odoo Migration</a>
+          <a href="/woocommerce-migration">WooCommerce Migration</a>
+          <a href="/pricing">Pricing</a>
+        </div>
+        <div class="footer-links">
+          <strong>Workspace</strong>
+          <a href="/dashboard">Dashboard</a>
+          <a href="/dashboard/messages">Messages</a>
+          <a href="/admin">Admin Panel</a>
+        </div>
+        <div class="footer-links">
+          <strong>Support</strong>
+          <a href="/help">Help & FAQ</a>
+          <a href="/login">Log in</a>
+          <a href="/signup">Create account</a>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <span>&copy; <span data-current-year></span> ShopifyMigrate.</span>
+        <span>Render-ready Node deployment with local `.env` support.</span>
+      </div>
     </div>
-  </div>
-</section>
+  </footer>
 </body>
 </html>

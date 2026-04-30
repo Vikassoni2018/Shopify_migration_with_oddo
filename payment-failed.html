@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Payment Failed | ShopifyMigrate</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/assets/css/saas-platform.css">
+  <script src="/assets/js/saas-platform.js" defer></script>
+</head>
+<body class="platform-body">
+  <div class="top-banner">Failure state for plan billing or checkout issues.</div>
+  <main class="page-shell auth-shell">
+    <section class="auth-wrap">
+      <article class="auth-card">
+        <span class="eyebrow">Payment failed</span>
+        <h1 class="auth-title">The plan purchase could not be completed.</h1>
+        <p class="muted">If you later connect a live payment processor, this page can handle declined cards, interrupted sessions, or missing customer confirmation.</p>
+        <ul class="status-list">
+          <li class="warning">Review the selected plan and order count.</li>
+          <li class="error">Retry the payment step or redirect the user back to the quote page.</li>
+          <li>Use the help center if the checkout path needs operator guidance.</li>
+        </ul>
+        <div class="button-row">
+          <a class="button-link primary" href="/checkout">Try again</a>
+          <a class="button-link secondary" href="/help">Open help center</a>
+        </div>
+      </article>
+      <article class="auth-card dark">
+        <span class="eyebrow">Useful checks</span>
+        <ul class="check-list">
+          <li>Confirm the right plan was selected.</li>
+          <li>Confirm billing or Stripe configuration.</li>
+          <li>Verify any entitlement update webhook completed.</li>
+        </ul>
+      </article>
+    </section>
+  </main>
+</body>
+</html>

@@ -1,485 +1,443 @@
 <!doctype html>
 <html lang="en">
 <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Deployment Admin</title>
-    <style>
-        :root {
-            --bg: #f4efe7;
-            --panel: rgba(255, 251, 246, 0.92);
-            --ink: #1f2933;
-            --muted: #6b7280;
-            --accent: #0f766e;
-            --accent-soft: rgba(15, 118, 110, 0.12);
-            --line: rgba(31, 41, 51, 0.1);
-            --danger: #b42318;
-            --success: #15803d;
-            --shadow: 0 24px 60px rgba(31, 41, 51, 0.12);
-            --radius: 24px;
-        }
-
-        * {
-            box-sizing: border-box;
-        }
-
-        body {
-            margin: 0;
-            min-height: 100vh;
-            font-family: "Aptos", "Segoe UI", sans-serif;
-            color: var(--ink);
-            background:
-                radial-gradient(circle at top left, rgba(238, 155, 0, 0.18), transparent 24%),
-                radial-gradient(circle at top right, rgba(15, 118, 110, 0.16), transparent 22%),
-                linear-gradient(145deg, #f8f4ee 0%, #ebe0cf 100%);
-            padding: 32px 18px 48px;
-        }
-
-        .shell {
-            max-width: 1040px;
-            margin: 0 auto;
-        }
-
-        .hero,
-        .panel,
-        .notice {
-            background: var(--panel);
-            border: 1px solid rgba(255, 255, 255, 0.6);
-            border-radius: var(--radius);
-            box-shadow: var(--shadow);
-            backdrop-filter: blur(16px);
-        }
-
-        .hero {
-            padding: 28px;
-            margin-bottom: 20px;
-        }
-
-        .eyebrow {
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-            padding: 8px 12px;
-            border-radius: 999px;
-            background: var(--accent-soft);
-            color: var(--accent);
-            font-size: 13px;
-            font-weight: 700;
-            letter-spacing: 0.04em;
-            text-transform: uppercase;
-        }
-
-        h1, h2 {
-            margin: 0;
-        }
-
-        h1 {
-            margin-top: 16px;
-            font-size: clamp(2rem, 4vw, 3.3rem);
-            line-height: 0.98;
-            letter-spacing: -0.03em;
-            font-family: Georgia, "Times New Roman", serif;
-        }
-
-        .hero p,
-        .panel p,
-        .notice p {
-            color: var(--muted);
-            line-height: 1.6;
-        }
-
-        .layout {
-            display: grid;
-            grid-template-columns: 360px 1fr;
-            gap: 20px;
-            align-items: start;
-        }
-
-        .panel,
-        .notice {
-            padding: 24px;
-        }
-
-        .field {
-            display: grid;
-            gap: 8px;
-            margin-top: 16px;
-        }
-
-        label {
-            font-size: 0.92rem;
-            font-weight: 700;
-        }
-
-        input {
-            width: 100%;
-            border: 1px solid rgba(31, 41, 51, 0.12);
-            border-radius: 14px;
-            padding: 12px 14px;
-            font: inherit;
-            background: rgba(255, 255, 255, 0.86);
-            color: var(--ink);
-        }
-
-        .actions {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 12px;
-            margin-top: 18px;
-        }
-
-        button {
-            appearance: none;
-            border: 0;
-            border-radius: 999px;
-            padding: 12px 18px;
-            font: inherit;
-            font-weight: 700;
-            cursor: pointer;
-        }
-
-        .primary {
-            background: linear-gradient(135deg, #0f766e, #0ea5a4);
-            color: white;
-        }
-
-        .secondary {
-            background: white;
-            color: var(--ink);
-            border: 1px solid var(--line);
-        }
-
-        .status {
-            min-height: 24px;
-            margin-top: 14px;
-            font-size: 0.95rem;
-            font-weight: 700;
-        }
-
-        .status.ok {
-            color: var(--success);
-        }
-
-        .status.error {
-            color: var(--danger);
-        }
-
-        .status.info {
-            color: var(--accent);
-        }
-
-        .meta {
-            margin-top: 18px;
-            border-radius: 18px;
-            border: 1px solid var(--line);
-            background: rgba(255, 255, 255, 0.72);
-            padding: 14px 16px;
-        }
-
-        .meta strong {
-            display: block;
-            margin-bottom: 4px;
-        }
-
-        .grid {
-            display: grid;
-            grid-template-columns: repeat(2, minmax(0, 1fr));
-            gap: 14px;
-            margin-top: 18px;
-        }
-
-        .stat {
-            border-radius: 18px;
-            border: 1px solid var(--line);
-            background: rgba(255, 255, 255, 0.76);
-            padding: 16px;
-        }
-
-        .stat strong {
-            display: block;
-            margin-bottom: 8px;
-            font-size: 1rem;
-        }
-
-        .chip {
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-            padding: 7px 12px;
-            border-radius: 999px;
-            font-size: 0.84rem;
-            font-weight: 700;
-        }
-
-        .chip.ok {
-            background: rgba(21, 128, 61, 0.12);
-            color: var(--success);
-        }
-
-        .chip.off {
-            background: rgba(180, 35, 24, 0.1);
-            color: var(--danger);
-        }
-
-        .detail {
-            margin-top: 10px;
-            color: var(--muted);
-            font-size: 0.94rem;
-            line-height: 1.5;
-            word-break: break-word;
-        }
-
-        .hidden {
-            display: none;
-        }
-
-        @media (max-width: 900px) {
-            .layout,
-            .grid {
-                grid-template-columns: 1fr;
-            }
-        }
-    </style>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Admin Panel | ShopifyMigrate</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/assets/css/saas-platform.css">
+  <script src="/assets/js/saas-platform.js" defer></script>
 </head>
-<body>
-    <div class="shell">
-        <section class="hero">
-            <span class="eyebrow">Render-ready admin</span>
-            <h1>Environment-backed deployment controls for local and Render.</h1>
-            <p>This panel now reads runtime settings from the server instead of storing secrets in the browser. Use <code>.env</code> locally, and use Render environment variables for production.</p>
-        </section>
+<body class="platform-body">
+  <div class="top-banner">Environment-backed admin workspace with session-based access.</div>
 
-        <section class="layout">
-            <div class="panel">
-                <h2>Admin Access</h2>
-                <p>Sign in with the admin credentials configured on the server.</p>
-                <div class="field">
-                    <label for="email">Admin email</label>
-                    <input id="email" type="email" placeholder="admin@example.com" autocomplete="username">
-                </div>
-                <div class="field">
-                    <label for="password">Password</label>
-                    <input id="password" type="password" placeholder="Enter admin password" autocomplete="current-password">
-                </div>
-                <div class="actions" id="loginActions">
-                    <button class="primary" id="loginButton" type="button">Sign In</button>
-                </div>
-                <div class="actions hidden" id="sessionActions">
-                    <button class="secondary" id="logoutButton" type="button">Sign Out</button>
-                </div>
-                <div class="meta" id="authMeta">
-                    <strong>Session inactive</strong>
-                    <span>This page becomes fully useful after <code>ADMIN_EMAIL</code> and <code>ADMIN_PASSWORD</code> are configured.</span>
-                </div>
-                <div class="status" id="statusMessage"></div>
+  <main class="page-shell">
+    <section id="adminLoginView" class="auth-shell">
+      <div class="auth-wrap">
+        <article class="auth-card dark">
+          <span class="eyebrow">Admin access</span>
+          <h1 class="auth-title">Sign in with the server-backed admin credentials.</h1>
+          <p class="muted">This route no longer stores secrets in the browser. The server validates the credentials from `.env` or Render environment variables and returns a signed session cookie.</p>
+          <ul class="check-list">
+            <li>Signed session cookie</li>
+            <li>Environment-aware config checks</li>
+            <li>Jobs, payments, and entitlement visibility after login</li>
+          </ul>
+        </article>
+
+        <article class="auth-card">
+          <span class="eyebrow">Log in</span>
+          <h2 class="card-title">Use the admin email and password configured on the server</h2>
+          <form class="form-stack" id="adminLoginForm">
+            <div class="field">
+              <label for="adminEmail">Admin email</label>
+              <input id="adminEmail" type="email" placeholder="admin@example.com" autocomplete="username">
+            </div>
+            <div class="field">
+              <label for="adminPassword">Admin password</label>
+              <input id="adminPassword" type="password" placeholder="Enter admin password" autocomplete="current-password">
+            </div>
+            <div class="button-row">
+              <button class="button primary" type="submit">Log in to admin</button>
+              <a class="button-link secondary" href="/dashboard">Back to dashboard</a>
+            </div>
+            <div class="status-message info" id="adminLoginStatus">Waiting for admin sign-in.</div>
+          </form>
+        </article>
+      </div>
+    </section>
+
+    <section id="adminWorkspaceView" class="hidden">
+      <div class="admin-layout">
+        <aside class="dashboard-sidebar">
+          <div class="sidebar-copy">
+            <a class="brand" href="/admin">
+              <span class="brand-mark">AD</span>
+              <span class="brand-copy">
+                <strong>Admin Panel</strong>
+                <span id="adminIdentity">Authenticated workspace</span>
+              </span>
+            </a>
+          </div>
+          <nav class="sidebar-nav">
+            <a href="/admin" data-route="/admin"><span class="nav-icon">D</span>Dashboard</a>
+            <a href="/admin/users" data-route="/admin/users"><span class="nav-icon">U</span>Users</a>
+            <a href="/admin/jobs" data-route="/admin/jobs"><span class="nav-icon">J</span>Jobs</a>
+            <a href="/admin/payments" data-route="/admin/payments"><span class="nav-icon">P</span>Payments</a>
+            <a href="/admin/settings" data-route="/admin/settings"><span class="nav-icon">S</span>Settings</a>
+            <button class="link-reset" type="button" id="adminLogoutButton"><span class="nav-icon">L</span>Log out</button>
+          </nav>
+        </aside>
+
+        <section class="dashboard-main">
+          <article class="panel">
+            <div class="toolbar">
+              <div>
+                <span class="eyebrow">Admin overview</span>
+                <h1 class="section-title" id="adminSectionTitle">Admin dashboard</h1>
+                <p class="section-subtitle" id="adminSectionCopy">Monitoring platform readiness and recent activity.</p>
+              </div>
+              <div class="toolbar-actions">
+                <a class="button-link secondary" href="/dashboard">User dashboard</a>
+                <button class="button primary" type="button" id="adminRefreshButton">Refresh data</button>
+              </div>
+            </div>
+            <div class="status-message info" id="adminWorkspaceStatus">Loading admin overview...</div>
+          </article>
+
+          <section id="adminSectionDashboard">
+            <div class="dashboard-metrics" id="adminMetricGrid">
+              <div class="metric-card"><span class="metric-value">0</span><span class="metric-label">Jobs</span></div>
+              <div class="metric-card"><span class="metric-value">0</span><span class="metric-label">Stores</span></div>
+              <div class="metric-card"><span class="metric-value">0</span><span class="metric-label">Payments</span></div>
             </div>
 
-            <div>
-                <div class="panel hidden" id="configPanel">
-                    <h2>Runtime Configuration</h2>
-                    <p>Secrets remain server-side. This page only shows deployment status and safe previews.</p>
-                    <div class="grid" id="configGrid"></div>
-                </div>
+            <div class="content-grid cols-2 page-section">
+              <article class="panel">
+                <span class="eyebrow">Config status</span>
+                <ul class="detail-list" id="adminConfigList">
+                  <li>Loading configuration status...</li>
+                </ul>
+              </article>
 
-                <div class="notice">
-                    <h2>How to manage settings</h2>
-                    <p>For local work, edit <code>.env</code> in the project root. For Render, keep secrets in the service environment variables and leave this panel read-only.</p>
-                    <p>That matches Render’s deployment model better, because the app filesystem is ephemeral and browser storage is not a safe place for admin secrets or Stripe keys.</p>
-                </div>
+              <article class="panel">
+                <span class="eyebrow">Latest jobs</span>
+                <ul class="status-list" id="adminRecentJobList">
+                  <li>Loading job activity...</li>
+                </ul>
+              </article>
             </div>
+          </section>
+
+          <section id="adminSectionUsers" class="table-card hidden">
+            <div class="table-header">
+              <div>
+                <span class="eyebrow">Store accounts</span>
+                <h2 class="card-title">Store entitlements and unlock state</h2>
+                <p class="table-subtext">This project currently tracks store entitlements rather than full end-user account records.</p>
+              </div>
+            </div>
+            <div class="table-wrap">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Store</th>
+                    <th>Paid quota</th>
+                    <th>Full unlock</th>
+                    <th>Transactions</th>
+                    <th>Last activity</th>
+                  </tr>
+                </thead>
+                <tbody id="adminStoresBody">
+                  <tr><td colspan="5">Loading store entitlements...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <section id="adminSectionJobs" class="table-card hidden">
+            <div class="table-header">
+              <div>
+                <span class="eyebrow">Jobs</span>
+                <h2 class="card-title">Recent migration jobs</h2>
+              </div>
+            </div>
+            <div class="table-wrap">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Job ID</th>
+                    <th>Status</th>
+                    <th>Orders</th>
+                    <th>Created</th>
+                    <th>Updated</th>
+                  </tr>
+                </thead>
+                <tbody id="adminJobsBody">
+                  <tr><td colspan="5">Loading jobs...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <section id="adminSectionPayments" class="table-card hidden">
+            <div class="table-header">
+              <div>
+                <span class="eyebrow">Payments</span>
+                <h2 class="card-title">Recent entitlement transactions</h2>
+              </div>
+            </div>
+            <div class="table-wrap">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Transaction</th>
+                    <th>Store</th>
+                    <th>Plan</th>
+                    <th>Event</th>
+                    <th>Granted at</th>
+                  </tr>
+                </thead>
+                <tbody id="adminPaymentsBody">
+                  <tr><td colspan="5">Loading payments...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <section id="adminSectionSettings" class="content-grid cols-2 hidden">
+            <article class="panel">
+              <span class="eyebrow">Runtime</span>
+              <ul class="detail-list" id="adminSettingsRuntime">
+                <li>Loading runtime configuration...</li>
+              </ul>
+            </article>
+            <article class="panel">
+              <span class="eyebrow">Secrets readiness</span>
+              <ul class="detail-list" id="adminSettingsSecrets">
+                <li>Loading secret status...</li>
+              </ul>
+            </article>
+          </section>
         </section>
-    </div>
+      </div>
+    </section>
+  </main>
 
-    <script>
-        (function () {
-            var emailInput = document.getElementById("email");
-            var passwordInput = document.getElementById("password");
-            var loginButton = document.getElementById("loginButton");
-            var logoutButton = document.getElementById("logoutButton");
-            var loginActions = document.getElementById("loginActions");
-            var sessionActions = document.getElementById("sessionActions");
-            var authMeta = document.getElementById("authMeta");
-            var statusMessage = document.getElementById("statusMessage");
-            var configPanel = document.getElementById("configPanel");
-            var configGrid = document.getElementById("configGrid");
-            var runtimeConfig = window.APP_CONFIG || {};
+  <script>
+    (function () {
+      function getSectionFromPath() {
+        var path = window.location.pathname || "/admin";
+        if (path.indexOf("/admin/users") === 0) {
+          return "users";
+        }
+        if (path.indexOf("/admin/jobs") === 0) {
+          return "jobs";
+        }
+        if (path.indexOf("/admin/payments") === 0) {
+          return "payments";
+        }
+        if (path.indexOf("/admin/settings") === 0) {
+          return "settings";
+        }
+        return "dashboard";
+      }
 
-            function setStatus(message, tone) {
-                statusMessage.textContent = message || "";
-                statusMessage.className = "status" + (tone ? " " + tone : "");
+      function setStatus(element, message, type) {
+        element.className = "status-message " + (type || "info");
+        element.textContent = message;
+      }
+
+      function formatDate(value) {
+        if (!value) {
+          return "—";
+        }
+        var date = new Date(value);
+        if (Number.isNaN(date.getTime())) {
+          return value;
+        }
+        return date.toLocaleString();
+      }
+
+      function renderDashboard(overview) {
+        var metrics = overview.metrics || {};
+        document.getElementById("adminMetricGrid").innerHTML = [
+          '<div class="metric-card"><span class="metric-value">' + PlatformApp.formatInteger(metrics.totalJobs) + '</span><span class="metric-label">Total jobs</span></div>',
+          '<div class="metric-card"><span class="metric-value">' + PlatformApp.formatInteger(metrics.activeStoreEntitlements) + '</span><span class="metric-label">Store entitlements</span></div>',
+          '<div class="metric-card"><span class="metric-value">' + PlatformApp.formatInteger(metrics.totalTransactions) + '</span><span class="metric-label">Transactions</span></div>'
+        ].join("");
+
+        var config = overview.configStatus || {};
+        document.getElementById("adminConfigList").innerHTML = [
+          '<li>Environment: ' + PlatformApp.escapeHtml(config.environment || "development") + '</li>',
+          '<li>Public base URL: ' + PlatformApp.escapeHtml(config.publicBaseUrl || "not set") + '</li>',
+          '<li>Default API base URL: ' + PlatformApp.escapeHtml(config.defaultApiBaseUrl || "not set") + '</li>',
+          '<li>Shopify API version: ' + PlatformApp.escapeHtml(overview.apiVersion || "") + '</li>'
+        ].join("");
+
+        var recentJobs = overview.recentJobs || [];
+        document.getElementById("adminRecentJobList").innerHTML = recentJobs.length
+          ? recentJobs.slice(0, 5).map(function (job) {
+              return '<li>' + PlatformApp.escapeHtml(job.id) + ' is ' + PlatformApp.escapeHtml(job.status) + ' with ' + PlatformApp.formatInteger((job.summary && job.summary.totalOrders) || 0) + ' orders.</li>';
+            }).join("")
+          : '<li>No jobs have been created yet.</li>';
+      }
+
+      function renderStores(overview) {
+        var stores = overview.stores || [];
+        document.getElementById("adminStoresBody").innerHTML = stores.length
+          ? stores.map(function (store) {
+              return [
+                "<tr>",
+                "<td>" + PlatformApp.escapeHtml(store.shopDomain || "—") + "</td>",
+                "<td>" + PlatformApp.formatInteger(store.paidOrderQuota || 0) + "</td>",
+                "<td>" + (store.fullMigrationUnlocked ? '<span class="badge success">Unlocked</span>' : '<span class="badge warning">Quota based</span>') + "</td>",
+                "<td>" + PlatformApp.formatInteger(store.transactionCount || 0) + "</td>",
+                "<td>" + PlatformApp.escapeHtml(formatDate(store.lastTransactionAt)) + "</td>",
+                "</tr>"
+              ].join("");
+            }).join("")
+          : '<tr><td colspan="5">No entitlement records yet.</td></tr>';
+      }
+
+      function renderJobs(overview) {
+        var jobs = overview.recentJobs || [];
+        document.getElementById("adminJobsBody").innerHTML = jobs.length
+          ? jobs.map(function (job) {
+              return [
+                "<tr>",
+                "<td>" + PlatformApp.escapeHtml(job.id) + "</td>",
+                "<td>" + PlatformApp.escapeHtml(job.status) + "</td>",
+                "<td>" + PlatformApp.formatInteger((job.summary && job.summary.totalOrders) || 0) + "</td>",
+                "<td>" + PlatformApp.escapeHtml(formatDate(job.createdAt)) + "</td>",
+                "<td>" + PlatformApp.escapeHtml(formatDate(job.updatedAt)) + "</td>",
+                "</tr>"
+              ].join("");
+            }).join("")
+          : '<tr><td colspan="5">No jobs recorded yet.</td></tr>';
+      }
+
+      function renderPayments(overview) {
+        var payments = overview.payments || [];
+        document.getElementById("adminPaymentsBody").innerHTML = payments.length
+          ? payments.map(function (payment) {
+              return [
+                "<tr>",
+                "<td>" + PlatformApp.escapeHtml(payment.transactionId || "—") + "</td>",
+                "<td>" + PlatformApp.escapeHtml(payment.shopDomain || "—") + "</td>",
+                "<td>" + PlatformApp.escapeHtml(payment.plan || "—") + "</td>",
+                "<td>" + PlatformApp.escapeHtml(payment.eventType || "—") + "</td>",
+                "<td>" + PlatformApp.escapeHtml(formatDate(payment.grantedAt)) + "</td>",
+                "</tr>"
+              ].join("");
+            }).join("")
+          : '<tr><td colspan="5">No payment or entitlement events recorded yet.</td></tr>';
+      }
+
+      function renderSettings(overview) {
+        var config = overview.configStatus || {};
+        document.getElementById("adminSettingsRuntime").innerHTML = [
+          '<li>Application: ' + PlatformApp.escapeHtml(config.appName || "ShopifyMigrate") + '</li>',
+          '<li>Environment: ' + PlatformApp.escapeHtml(config.environment || "development") + '</li>',
+          '<li>Default time offset: ' + PlatformApp.escapeHtml(config.defaultTimeZoneOffset || "") + '</li>',
+          '<li>Admin configured: ' + (config.adminConfigured ? "Yes" : "No") + '</li>'
+        ].join("");
+
+        document.getElementById("adminSettingsSecrets").innerHTML = [
+          '<li>Stripe publishable key: ' + (config.stripePublishableKeyConfigured ? "Configured" : "Missing") + '</li>',
+          '<li>Stripe secret key: ' + (config.stripeSecretKeyConfigured ? "Configured" : "Missing") + '</li>',
+          '<li>Stripe webhook secret: ' + (config.stripeWebhookSecretConfigured ? "Configured" : "Missing") + '</li>',
+          '<li>Admin email: ' + PlatformApp.escapeHtml(config.adminEmail || "not set") + '</li>'
+        ].join("");
+      }
+
+      function showSection(section) {
+        var titles = {
+          dashboard: ["Admin dashboard", "Monitoring platform readiness and recent activity."],
+          users: ["Store entitlement view", "Quota and unlock state tracked per store domain."],
+          jobs: ["Migration jobs", "Recent import and sync jobs recorded by the server."],
+          payments: ["Payment activity", "Recent quota and full-unlock transaction events."],
+          settings: ["Platform settings", "Runtime configuration and secret readiness."],
+        };
+
+        ["dashboard", "users", "jobs", "payments", "settings"].forEach(function (key) {
+          var element = document.getElementById("adminSection" + key.charAt(0).toUpperCase() + key.slice(1));
+          if (element) {
+            element.classList.toggle("hidden", key !== section);
+          }
+        });
+
+        document.getElementById("adminSectionTitle").textContent = titles[section][0];
+        document.getElementById("adminSectionCopy").textContent = titles[section][1];
+      }
+
+      document.addEventListener("DOMContentLoaded", function () {
+        var loginView = document.getElementById("adminLoginView");
+        var workspaceView = document.getElementById("adminWorkspaceView");
+        var loginForm = document.getElementById("adminLoginForm");
+        var loginStatus = document.getElementById("adminLoginStatus");
+        var workspaceStatus = document.getElementById("adminWorkspaceStatus");
+        var refreshButton = document.getElementById("adminRefreshButton");
+        var logoutButton = document.getElementById("adminLogoutButton");
+        var currentSection = getSectionFromPath();
+
+        async function loadOverview() {
+          setStatus(workspaceStatus, "Loading admin overview...", "info");
+
+          try {
+            var payload = await PlatformApp.requestJson("/api/admin/overview");
+            var overview = payload.overview || {};
+            document.getElementById("adminIdentity").textContent = payload.admin && payload.admin.email ? payload.admin.email : "Authenticated workspace";
+
+            renderDashboard(overview);
+            renderStores(overview);
+            renderJobs(overview);
+            renderPayments(overview);
+            renderSettings(overview);
+            setStatus(workspaceStatus, "Admin overview loaded.", "success");
+          } catch (error) {
+            setStatus(workspaceStatus, error.message, "error");
+          }
+        }
+
+        async function checkSession() {
+          try {
+            var session = await PlatformApp.requestJson("/api/admin/session");
+            if (!session.authenticated) {
+              loginView.classList.remove("hidden");
+              workspaceView.classList.add("hidden");
+              return;
             }
 
-            async function requestJson(url, options) {
-                var response = await fetch(url, Object.assign({
-                    headers: {
-                        "Content-Type": "application/json"
-                    }
-                }, options || {}));
-                var data = await response.json().catch(function () {
-                    return {};
-                });
+            loginView.classList.add("hidden");
+            workspaceView.classList.remove("hidden");
+            showSection(currentSection);
+            await loadOverview();
+          } catch (error) {
+            loginView.classList.remove("hidden");
+            workspaceView.classList.add("hidden");
+            setStatus(loginStatus, error.message, "error");
+          }
+        }
 
-                if (!response.ok || data.ok === false) {
-                    throw new Error(data.error || "Request failed.");
-                }
+        loginForm.addEventListener("submit", async function (event) {
+          event.preventDefault();
+          setStatus(loginStatus, "Signing in...", "info");
 
-                return data;
-            }
-
-            function createStatusChip(enabled, text) {
-                return "<span class=\"chip " + (enabled ? "ok" : "off") + "\">" + text + "</span>";
-            }
-
-            function renderConfigStatus(configStatus) {
-                if (!configStatus) {
-                    configGrid.innerHTML = "";
-                    configPanel.classList.add("hidden");
-                    return;
-                }
-
-                var cards = [
-                    {
-                        title: "Environment",
-                        chip: createStatusChip(true, configStatus.environment || "development"),
-                        detail: "App name: " + (configStatus.appName || runtimeConfig.appName || "Shopify Migration with Odoo")
-                    },
-                    {
-                        title: "Public base URL",
-                        chip: createStatusChip(Boolean(configStatus.publicBaseUrl), configStatus.publicBaseUrl ? "Configured" : "Missing"),
-                        detail: configStatus.publicBaseUrl || runtimeConfig.publicBaseUrl || "No public base URL configured yet."
-                    },
-                    {
-                        title: "Default API base",
-                        chip: createStatusChip(Boolean(configStatus.defaultApiBaseUrl), configStatus.defaultApiBaseUrl ? "Configured" : "Missing"),
-                        detail: configStatus.defaultApiBaseUrl || runtimeConfig.defaultApiBaseUrl || window.location.origin
-                    },
-                    {
-                        title: "Default order timezone",
-                        chip: createStatusChip(Boolean(configStatus.defaultTimeZoneOffset), configStatus.defaultTimeZoneOffset || "Unset"),
-                        detail: "Used for imported order timestamps when the page does not provide a custom override."
-                    },
-                    {
-                        title: "Stripe publishable key",
-                        chip: createStatusChip(configStatus.stripePublishableKeyConfigured, configStatus.stripePublishableKeyConfigured ? "Configured" : "Missing"),
-                        detail: configStatus.stripePublishableKeyPreview || "Set STRIPE_PUBLISHABLE_KEY in .env or Render."
-                    },
-                    {
-                        title: "Stripe secret key",
-                        chip: createStatusChip(configStatus.stripeSecretKeyConfigured, configStatus.stripeSecretKeyConfigured ? "Configured" : "Missing"),
-                        detail: "The raw secret is intentionally never returned to the browser."
-                    },
-                    {
-                        title: "Stripe webhook secret",
-                        chip: createStatusChip(configStatus.stripeWebhookSecretConfigured, configStatus.stripeWebhookSecretConfigured ? "Configured" : "Missing"),
-                        detail: "If present, the webhook endpoint verifies the Stripe signature before accepting events."
-                    },
-                    {
-                        title: "Admin login",
-                        chip: createStatusChip(configStatus.adminConfigured, configStatus.adminConfigured ? "Configured" : "Missing"),
-                        detail: configStatus.adminEmail || "Set ADMIN_EMAIL and ADMIN_PASSWORD to enable server-backed admin access."
-                    }
-                ];
-
-                configGrid.innerHTML = cards.map(function (card) {
-                    return [
-                        "<article class=\"stat\">",
-                        "<strong>" + card.title + "</strong>",
-                        card.chip,
-                        "<div class=\"detail\">" + card.detail + "</div>",
-                        "</article>"
-                    ].join("");
-                }).join("");
-
-                configPanel.classList.remove("hidden");
-            }
-
-            function renderAuthState(sessionData) {
-                var authenticated = Boolean(sessionData && sessionData.authenticated);
-                loginActions.classList.toggle("hidden", authenticated);
-                sessionActions.classList.toggle("hidden", !authenticated);
-                emailInput.disabled = authenticated;
-                passwordInput.disabled = authenticated;
-
-                if (authenticated) {
-                    authMeta.innerHTML = "<strong>Signed in as " + (sessionData.admin && sessionData.admin.email ? sessionData.admin.email : "admin") + "</strong><span>Environment values are being read from the server runtime.</span>";
-                    renderConfigStatus(sessionData.configStatus || null);
-                } else {
-                    var readyText = sessionData && sessionData.adminConfigured
-                        ? "Server-side admin credentials are configured. Sign in to view deployment status."
-                        : "Set ADMIN_EMAIL and ADMIN_PASSWORD in .env or Render first, then reload this page.";
-                    authMeta.innerHTML = "<strong>Session inactive</strong><span>" + readyText + "</span>";
-                    renderConfigStatus(null);
-                }
-            }
-
-            async function refreshSession() {
-                try {
-                    var sessionData = await requestJson("/api/admin/session", {
-                        method: "GET"
-                    });
-                    renderAuthState(sessionData);
-                    if (!sessionData.authenticated) {
-                        setStatus(sessionData.adminConfigured ? "Sign in to inspect the deployment configuration." : "Admin credentials are not configured on the server yet.", "info");
-                    } else {
-                        setStatus("Admin session is active.", "ok");
-                    }
-                } catch (error) {
-                    renderAuthState({ authenticated: false, adminConfigured: false, configStatus: null });
-                    setStatus(error.message, "error");
-                }
-            }
-
-            async function login() {
-                loginButton.disabled = true;
-                setStatus("Signing in...", "info");
-
-                try {
-                    var data = await requestJson("/api/admin/login", {
-                        method: "POST",
-                        body: JSON.stringify({
-                            email: emailInput.value,
-                            password: passwordInput.value
-                        })
-                    });
-                    passwordInput.value = "";
-                    renderAuthState(data);
-                    setStatus("Signed in successfully.", "ok");
-                } catch (error) {
-                    renderAuthState({ authenticated: false, adminConfigured: true, configStatus: null });
-                    setStatus(error.message, "error");
-                } finally {
-                    loginButton.disabled = false;
-                }
-            }
-
-            async function logout() {
-                logoutButton.disabled = true;
-                setStatus("Signing out...", "info");
-
-                try {
-                    await requestJson("/api/admin/logout", {
-                        method: "POST",
-                        body: JSON.stringify({})
-                    });
-                    renderAuthState({ authenticated: false, adminConfigured: true, configStatus: null });
-                    setStatus("Signed out.", "ok");
-                } catch (error) {
-                    setStatus(error.message, "error");
-                } finally {
-                    logoutButton.disabled = false;
-                }
-            }
-
-            loginButton.addEventListener("click", login);
-            logoutButton.addEventListener("click", logout);
-            passwordInput.addEventListener("keydown", function (event) {
-                if (event.key === "Enter") {
-                    login();
-                }
+          try {
+            await PlatformApp.requestJson("/api/admin/login", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                email: document.getElementById("adminEmail").value,
+                password: document.getElementById("adminPassword").value
+              })
             });
 
-            refreshSession();
-        }());
-    </script>
+            setStatus(loginStatus, "Login successful. Loading workspace...", "success");
+            await checkSession();
+          } catch (error) {
+            setStatus(loginStatus, error.message, "error");
+          }
+        });
+
+        refreshButton.addEventListener("click", loadOverview);
+        logoutButton.addEventListener("click", async function () {
+          try {
+            await PlatformApp.requestJson("/api/admin/logout", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" }
+            });
+          } catch (error) {
+            // Ignore logout response errors and reset the view anyway.
+          }
+
+          window.location.href = "/admin";
+        });
+
+        checkSession();
+      });
+    }());
+  </script>
 </body>
 </html>

@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Messages | ShopifyMigrate</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/assets/css/saas-platform.css">
+  <script src="/assets/js/saas-platform.js" defer></script>
+</head>
+<body class="platform-body">
+  <div class="top-banner">Operator notices and workspace reminders.</div>
+  <main class="page-shell">
+    <div class="dashboard-layout">
+      <aside class="dashboard-sidebar">
+        <div class="sidebar-copy">
+          <a class="brand" href="/"><span class="brand-mark">SM</span><span class="brand-copy"><strong>ShopifyMigrate</strong><span>Operator dashboard</span></span></a>
+        </div>
+        <nav class="sidebar-nav">
+          <a href="/dashboard" data-route="/dashboard"><span class="nav-icon">D</span>Dashboard</a>
+          <a href="/dashboard/odoo" data-route="/dashboard/odoo"><span class="nav-icon">O</span>Odoo Migration</a>
+          <a href="/dashboard/woocommerce" data-route="/dashboard/woocommerce"><span class="nav-icon">W</span>WooCommerce</a>
+          <a href="/dashboard/odoo-panel" data-route="/dashboard/odoo-panel"><span class="nav-icon">I</span>Import Workspace</a>
+          <a href="/dashboard/messages" data-route="/dashboard/messages"><span class="nav-icon">M</span>Messages</a>
+        </nav>
+      </aside>
+
+      <section class="dashboard-main">
+        <article class="panel">
+          <span class="eyebrow">Messages</span>
+          <h1 class="section-title">Notifications and next-step reminders</h1>
+          <p class="section-subtitle">These messages are tailored to the routes and setup already present in your project.</p>
+        </article>
+
+        <div class="content-grid cols-2">
+          <article class="notice-card success">
+            <span class="badge success">Ready</span>
+            <h2 class="card-title">WooCommerce direct import route is available</h2>
+            <p class="card-copy">Use `/woocommerce-migration` when you want CSV conversion plus direct Shopify product creation and image import support.</p>
+          </article>
+          <article class="notice-card warning">
+            <span class="badge warning">Check</span>
+            <h2 class="card-title">Verify Shopify API token scopes before importing</h2>
+            <p class="card-copy">Product creation, updates, and order import depend on valid Shopify Admin API credentials and the right scopes for the chosen workflow.</p>
+          </article>
+        </div>
+
+        <section class="panel">
+          <span class="eyebrow">Activity stream</span>
+          <ul class="timeline">
+            <li>
+              <span class="timeline-dot"></span>
+              <div class="timeline-content">
+                <strong>Local runtime detected</strong>
+                <p class="small-copy" id="runtimeNotice">The app is currently using the runtime configuration served by the Node server.</p>
+              </div>
+            </li>
+            <li>
+              <span class="timeline-dot"></span>
+              <div class="timeline-content">
+                <strong>Admin panel available</strong>
+                <p class="small-copy">Use `/admin` for environment status, job monitoring, store entitlements, and payment activity.</p>
+              </div>
+            </li>
+            <li>
+              <span class="timeline-dot"></span>
+              <div class="timeline-content">
+                <strong>Payment quote endpoint ready</strong>
+                <p class="small-copy">Open `/pricing` or `/checkout` to calculate order-based plan requirements from the live quote endpoint.</p>
+              </div>
+            </li>
+          </ul>
+        </section>
+      </section>
+    </div>
+  </main>
+
+  <script>
+    document.addEventListener("DOMContentLoaded", function () {
+      var config = PlatformApp.getAppConfig();
+      var runtimeNotice = document.getElementById("runtimeNotice");
+      runtimeNotice.textContent = "Environment: " + (config.environment || "development") + " | API base: " + (config.defaultApiBaseUrl || config.localApiBaseUrl || "local");
+    });
+  </script>
+</body>
+</html>

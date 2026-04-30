@@ -1,132 +1,1064 @@
 <!doctype html>
-<html lang='en'>
+<html lang="en">
 <head>
-  <meta charset='utf-8'>
-  <meta name='viewport' content='width=device-width,initial-scale=1'>
-  <title>WooCommerce → Shopify Product Migration</title>
-  <link rel='stylesheet' href='/assets/css/frontend.css'>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>WooCommerce to Shopify Product Migration</title>
+  <link rel="stylesheet" href="/assets/css/frontend.css">
   <style>
-    .tabs{display:flex;gap:10px;flex-wrap:wrap;margin:14px 0}
-    .tab-btn{padding:10px 14px;border:1px solid #d7dbe7;border-radius:8px;background:#fff;cursor:pointer}
-    .tab-btn.active{background:#111827;color:#fff}
-    .tab-panel{display:none}
-    .tab-panel.active{display:block}
-    .form-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px}
-    .form-grid input, .form-grid textarea{width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:8px}
-    .actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px}
-    .btn{padding:10px 14px;border:none;border-radius:8px;cursor:pointer;background:#1f2937;color:#fff}
-    .btn.secondary{background:#475569}
-    .log{background:#0f172a;color:#e2e8f0;padding:10px;border-radius:8px;white-space:pre-wrap;min-height:80px}
-    table{width:100%;border-collapse:collapse;margin-top:10px}
-    th,td{padding:8px;border:1px solid #e2e8f0;font-size:13px;text-align:left}
+    :root {
+      --canvas: #f3ede4;
+      --paper: rgba(255, 251, 246, 0.9);
+      --ink: #18212b;
+      --muted: #6f685f;
+      --line: rgba(24, 33, 43, 0.1);
+      --teal: #0f766e;
+      --teal-strong: #0b5d57;
+      --gold: #c87412;
+      --gold-soft: rgba(200, 116, 18, 0.14);
+      --ocean-soft: rgba(15, 118, 110, 0.12);
+      --night: #17202a;
+      --success: #1f7a43;
+      --danger: #b63c3c;
+      --shadow: 0 26px 60px rgba(34, 42, 57, 0.14);
+      --radius-xl: 30px;
+      --radius-lg: 22px;
+      --radius-md: 16px;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body.wp-migration-page {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "Aptos", "Segoe UI", "Trebuchet MS", sans-serif;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at top left, rgba(200, 116, 18, 0.17), transparent 24%),
+        radial-gradient(circle at top right, rgba(15, 118, 110, 0.16), transparent 24%),
+        linear-gradient(150deg, #f8f5ef 0%, #e9dece 100%);
+    }
+
+    .topbar.wp-topbar {
+      background: linear-gradient(90deg, #f3c98d 0%, #f6dcb7 28%, #caece7 100%);
+      color: #23413d;
+      font-size: 13px;
+      letter-spacing: 0.02em;
+    }
+
+    .wp-shell {
+      max-width: 1220px;
+      margin: 0 auto;
+      padding: 30px 20px 64px;
+    }
+
+    .wp-hero {
+      position: relative;
+      overflow: hidden;
+      display: grid;
+      grid-template-columns: minmax(0, 1.15fr) minmax(280px, 0.85fr);
+      gap: 22px;
+      align-items: stretch;
+      margin-top: 18px;
+    }
+
+    .wp-card,
+    .wp-hero-main,
+    .wp-hero-side,
+    .wp-workbench,
+    .wp-rail-card,
+    .wp-tab-panel,
+    .wp-map-card {
+      background: var(--paper);
+      border: 1px solid rgba(255, 255, 255, 0.5);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(16px);
+    }
+
+    .wp-hero-main,
+    .wp-hero-side,
+    .wp-workbench,
+    .wp-rail-card,
+    .wp-tab-panel,
+    .wp-map-card {
+      border-radius: var(--radius-xl);
+    }
+
+    .wp-hero-main {
+      position: relative;
+      padding: 34px;
+      background:
+        linear-gradient(140deg, rgba(255, 251, 246, 0.96), rgba(247, 242, 235, 0.82)),
+        var(--paper);
+    }
+
+    .wp-hero-main::after {
+      content: "";
+      position: absolute;
+      right: -62px;
+      top: -42px;
+      width: 220px;
+      height: 220px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(15, 118, 110, 0.18), transparent 68%);
+      pointer-events: none;
+    }
+
+    .wp-hero-side {
+      padding: 28px;
+      display: grid;
+      gap: 16px;
+      align-content: start;
+      background:
+        linear-gradient(180deg, rgba(19, 32, 43, 0.94), rgba(23, 32, 42, 0.86)),
+        var(--night);
+      color: #f3efe8;
+    }
+
+    .wp-eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      border-radius: 999px;
+      background: var(--gold-soft);
+      color: var(--gold);
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
+
+    .wp-hero h1 {
+      margin: 18px 0 14px;
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: clamp(2.4rem, 5vw, 4.5rem);
+      line-height: 0.96;
+      letter-spacing: -0.04em;
+    }
+
+    .wp-lead {
+      margin: 0;
+      max-width: 58ch;
+      color: var(--muted);
+      line-height: 1.7;
+      font-size: 1.02rem;
+    }
+
+    .wp-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-top: 24px;
+    }
+
+    .wp-btn-link,
+    .wp-button {
+      appearance: none;
+      border: 0;
+      border-radius: 999px;
+      padding: 13px 19px;
+      font: inherit;
+      font-weight: 700;
+      text-decoration: none;
+      cursor: pointer;
+      transition: transform 160ms ease, box-shadow 160ms ease, opacity 160ms ease;
+    }
+
+    .wp-btn-link:hover,
+    .wp-button:hover:not(:disabled) {
+      transform: translateY(-1px);
+    }
+
+    .wp-btn-link.primary,
+    .wp-button.primary {
+      background: linear-gradient(135deg, var(--teal), #15a59a);
+      color: #fff;
+      box-shadow: 0 18px 30px rgba(15, 118, 110, 0.22);
+    }
+
+    .wp-btn-link.secondary,
+    .wp-button.secondary {
+      background: rgba(255, 255, 255, 0.84);
+      color: var(--ink);
+      border: 1px solid var(--line);
+    }
+
+    .wp-button.warn {
+      background: linear-gradient(135deg, #b36c12, #d48a25);
+      color: #fff;
+      box-shadow: 0 18px 30px rgba(180, 111, 16, 0.2);
+    }
+
+    .wp-button:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+      transform: none;
+      box-shadow: none;
+    }
+
+    .wp-metrics {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 14px;
+      margin-top: 26px;
+    }
+
+    .wp-metric {
+      border-radius: var(--radius-md);
+      padding: 15px 16px;
+      background: rgba(255, 255, 255, 0.68);
+      border: 1px solid rgba(24, 33, 43, 0.08);
+    }
+
+    .wp-metric strong {
+      display: block;
+      margin-bottom: 6px;
+      color: var(--teal);
+      font-size: 1.3rem;
+      font-family: Georgia, "Times New Roman", serif;
+    }
+
+    .wp-metric span {
+      display: block;
+      color: var(--muted);
+      line-height: 1.45;
+      font-size: 0.93rem;
+    }
+
+    .wp-side-kicker {
+      display: grid;
+      gap: 12px;
+    }
+
+    .wp-side-kicker strong {
+      display: block;
+      font-size: 1rem;
+      letter-spacing: 0.01em;
+    }
+
+    .wp-side-kicker p,
+    .wp-side-kicker li {
+      color: rgba(243, 239, 232, 0.8);
+      line-height: 1.55;
+      margin: 0;
+    }
+
+    .wp-side-kicker ul {
+      display: grid;
+      gap: 10px;
+      padding-left: 18px;
+      margin: 0;
+    }
+
+    .wp-pulse {
+      padding: 14px 16px;
+      border-radius: var(--radius-md);
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .wp-layout {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr);
+      gap: 22px;
+      align-items: start;
+      margin-top: 28px;
+    }
+
+    .wp-rail-card h2,
+    .wp-workbench h2,
+    .wp-tab-panel h3,
+    .wp-map-card h3 {
+      margin: 0;
+    }
+
+    .wp-workbench {
+      padding: 22px;
+    }
+
+    .wp-workbench-top {
+      display: flex;
+      justify-content: space-between;
+      gap: 18px;
+      align-items: end;
+      flex-wrap: wrap;
+      padding-bottom: 16px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .wp-workbench-top p {
+      margin: 8px 0 0;
+      color: var(--muted);
+      max-width: 56ch;
+      line-height: 1.6;
+    }
+
+    .wp-api-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      max-width: 100%;
+      padding: 10px 14px;
+      border-radius: 999px;
+      background: var(--ocean-soft);
+      color: var(--teal-strong);
+      font-size: 0.9rem;
+      font-weight: 700;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .wp-tabs {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin: 18px 0 20px;
+    }
+
+    .wp-tab-btn {
+      appearance: none;
+      border: 1px solid rgba(24, 33, 43, 0.1);
+      background: rgba(255, 255, 255, 0.72);
+      color: var(--ink);
+      border-radius: 999px;
+      padding: 11px 16px;
+      font: inherit;
+      font-weight: 700;
+      cursor: pointer;
+      transition: background 160ms ease, color 160ms ease, transform 160ms ease;
+    }
+
+    .wp-tab-btn.active {
+      background: linear-gradient(135deg, var(--night), #223042);
+      color: #fff;
+      transform: translateY(-1px);
+    }
+
+    .wp-tab-panel {
+      display: none;
+      padding: 22px;
+      background: rgba(255, 255, 255, 0.66);
+    }
+
+    .wp-tab-panel.active {
+      display: block;
+    }
+
+    .wp-tab-panel h3 {
+      font-size: 1.4rem;
+      margin-bottom: 8px;
+    }
+
+    .wp-tab-panel > p {
+      margin: 0 0 18px;
+      color: var(--muted);
+      line-height: 1.65;
+    }
+
+    .wp-form-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    .wp-field {
+      display: grid;
+      gap: 8px;
+    }
+
+    .wp-field.span-2 {
+      grid-column: 1 / -1;
+    }
+
+    .wp-field label {
+      font-size: 0.92rem;
+      font-weight: 700;
+    }
+
+    .wp-field input {
+      width: 100%;
+      border: 1px solid rgba(24, 33, 43, 0.12);
+      border-radius: 15px;
+      padding: 13px 14px;
+      font: inherit;
+      background: rgba(255, 255, 255, 0.86);
+      color: var(--ink);
+    }
+
+    .wp-dropzone {
+      position: relative;
+      display: grid;
+      gap: 7px;
+      padding: 24px;
+      border-radius: 24px;
+      border: 2px dashed rgba(15, 118, 110, 0.28);
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.88), rgba(240, 248, 246, 0.92));
+      text-align: left;
+      transition: border-color 160ms ease, transform 160ms ease;
+    }
+
+    .wp-dropzone:hover {
+      border-color: rgba(15, 118, 110, 0.46);
+      transform: translateY(-1px);
+    }
+
+    .wp-dropzone strong {
+      font-size: 1.02rem;
+    }
+
+    .wp-dropzone span {
+      color: var(--muted);
+      line-height: 1.55;
+      font-size: 0.94rem;
+    }
+
+    .wp-file-input {
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+      cursor: pointer;
+    }
+
+    .wp-actions-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-top: 16px;
+    }
+
+    .wp-meta-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px;
+      margin-top: 18px;
+    }
+
+    .wp-meta-box {
+      border-radius: 18px;
+      border: 1px solid var(--line);
+      background: rgba(255, 255, 255, 0.72);
+      padding: 15px 16px;
+    }
+
+    .wp-meta-box strong {
+      display: block;
+      margin-bottom: 5px;
+    }
+
+    .wp-meta-box span {
+      color: var(--muted);
+      line-height: 1.5;
+      font-size: 0.94rem;
+      word-break: break-word;
+    }
+
+    .wp-log {
+      margin-top: 18px;
+      min-height: 92px;
+      border-radius: 22px;
+      padding: 16px 18px;
+      background: linear-gradient(180deg, #15202b, #1d2935);
+      color: #edf3f8;
+      white-space: pre-wrap;
+      line-height: 1.58;
+      font-family: Consolas, "Courier New", monospace;
+      font-size: 0.93rem;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+    }
+
+    .wp-log.is-error {
+      background: linear-gradient(180deg, #3a1d21, #54262b);
+      color: #ffd7dc;
+    }
+
+    .wp-log.is-success {
+      background: linear-gradient(180deg, #123025, #194634);
+      color: #d6f7e5;
+    }
+
+    .wp-map-card {
+      margin-top: 18px;
+      overflow: hidden;
+    }
+
+    .wp-map-header {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: center;
+      padding: 18px 20px 14px;
+    }
+
+    .wp-map-header p {
+      margin: 6px 0 0;
+      color: var(--muted);
+    }
+
+    .wp-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      border-radius: 999px;
+      padding: 8px 12px;
+      background: var(--gold-soft);
+      color: var(--gold);
+      font-size: 0.88rem;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    .wp-table-wrap {
+      overflow: auto;
+      border-top: 1px solid var(--line);
+    }
+
+    .wp-table {
+      width: 100%;
+      min-width: 720px;
+      border-collapse: collapse;
+      background: rgba(255, 255, 255, 0.52);
+    }
+
+    .wp-table th,
+    .wp-table td {
+      padding: 13px 16px;
+      border-bottom: 1px solid rgba(24, 33, 43, 0.08);
+      text-align: left;
+      vertical-align: top;
+      font-size: 0.94rem;
+      line-height: 1.5;
+    }
+
+    .wp-table th {
+      position: sticky;
+      top: 0;
+      z-index: 1;
+      background: rgba(243, 248, 247, 0.98);
+      color: var(--teal-strong);
+      font-size: 0.82rem;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
+
+    @media (max-width: 1040px) {
+      .wp-hero,
+      .wp-layout,
+      .wp-form-grid,
+      .wp-meta-grid,
+      .wp-metrics {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 720px) {
+      .wp-shell {
+        padding-inline: 14px;
+      }
+
+      .wp-hero-main,
+      .wp-hero-side,
+      .wp-workbench,
+      .wp-rail-card,
+      .wp-tab-panel {
+        padding: 20px;
+      }
+
+      .wp-hero h1 {
+        font-size: 2.3rem;
+      }
+
+      .wp-workbench-top {
+        align-items: start;
+      }
+    }
   </style>
 </head>
-<body>
-<div class='topbar'>Two methods: direct CSV conversion and API sync to Shopify.</div>
-<header class='header'><div class='brand'>Migration Portal</div><nav class='nav'><a href='/'>Home</a><a href='/odoo-migration'>Odoo Migration</a><a href='/woocommerce-migration'>WooCommerce Migration</a><a href='/wp-to-shopify-migration'>WP → Shopify Import</a><a href='/admin'>Admin</a></nav></header>
-<section class='container'>
-  <h2 class='section-title'>WordPress WooCommerce Products → Shopify</h2>
-  <p class='section-sub'>Tab 1 creates a Shopify import CSV from a WooCommerce export CSV. Tab 2 syncs products directly to Shopify using domain + access token.</p>
+<body class="wp-migration-page">
+<div class="topbar wp-topbar">CSV conversion, live Shopify sync, and field mapping in one focused workspace.</div>
+<header class="header">
+  <div class="brand">ShopifyMigrate</div>
+  <nav class="nav">
+    <a href="/">Home</a>
+    <a href="/pricing">Pricing</a>
+    <a href="/help">Help</a>
+    <a href="/dashboard">Dashboard</a>
+    <a href="/admin">Admin</a>
+  </nav>
+</header>
 
-  <div class='tabs'>
-    <button class='tab-btn active' data-tab='convert'>Method 1: Direct CSV Upload</button>
-    <button class='tab-btn' data-tab='sync'>Method 2: Shopify API Update</button>
-    <button class='tab-btn' data-tab='fields'>WooCommerce + Shopify Fields</button>
-  </div>
+<main class="wp-shell">
+  <section class="wp-hero">
+    <article class="wp-hero-main">
+      <span class="wp-eyebrow">WooCommerce to Shopify</span>
+      <h1>Turn messy product exports into Shopify-ready catalog data without leaving this page.</h1>
+      <p class="wp-lead">
+        Use the converter when you need a safe CSV handoff, or switch to live sync when you are ready to push products directly into Shopify. The page keeps both workflows visible, faster to scan, and easier to trust.
+      </p>
+      <div class="wp-actions">
+        <a class="wp-btn-link primary" href="#migration-workbench">Open the Workbench</a>
+        <a class="wp-btn-link secondary" href="/dashboard">Back to Dashboard</a>
+      </div>
+      <div class="wp-metrics">
+        <div class="wp-metric">
+          <strong>2 Paths</strong>
+          <span>Choose between downloadable CSV output and direct Shopify API updates.</span>
+        </div>
+        <div class="wp-metric">
+          <strong>43 Fields</strong>
+          <span>Common WooCommerce product fields are already mapped into Shopify import columns.</span>
+        </div>
+        <div class="wp-metric">
+          <strong>1 Workspace</strong>
+          <span>Conversion, sync, and mapping reference stay together so operators do not bounce between pages.</span>
+        </div>
+      </div>
+    </article>
 
-  <div id='convert' class='tab-panel active'>
-    <h3>Convert WooCommerce CSV to Shopify Product CSV</h3>
-    <input id='wcCsvFile' type='file' accept='.csv,text/csv'>
-    <div class='actions'>
-      <button class='btn' id='convertBtn'>Generate Shopify CSV</button>
-      <button class='btn secondary' id='downloadBtn' disabled>Download Shopify CSV</button>
-    </div>
-    <div id='convertLog' class='log'></div>
-  </div>
+    <aside class="wp-hero-side">
+      <div class="wp-side-kicker">
+        <strong>Migration pulse</strong>
+        <p>Best for stores that want a fast first pass before fine-tuning SEO, images, or variants after import.</p>
+      </div>
+      <div class="wp-pulse">
+        <div class="wp-side-kicker">
+          <strong>Before you upload</strong>
+          <ul>
+            <li>Export products from WooCommerce with headers included.</li>
+            <li>Check that price, stock, and SKU columns are populated consistently.</li>
+            <li>Use a private Shopify custom app token for live sync.</li>
+          </ul>
+        </div>
+      </div>
+      <div class="wp-pulse">
+        <div class="wp-side-kicker">
+          <strong>What this tool handles</strong>
+          <p>Products only. Customers and orders still belong in the broader migration flow, not this screen.</p>
+        </div>
+      </div>
+    </aside>
+  </section>
 
-  <div id='sync' class='tab-panel'>
-    <h3>Sync/Update Products in Shopify from WooCommerce CSV</h3>
-    <div class='form-grid'>
-      <div><label>Shopify Domain</label><input id='shopDomain' placeholder='your-store.myshopify.com'></div>
-      <div><label>Shopify Access Token</label><input id='accessToken' placeholder='shpat_xxx'></div>
-      <div><label>WooCommerce Product CSV</label><input id='syncCsvFile' type='file' accept='.csv,text/csv'></div>
-    </div>
-    <div class='actions'><button class='btn' id='syncBtn'>Upload & Update Shopify Products</button></div>
-    <div id='syncLog' class='log'></div>
-  </div>
+  <section class="wp-layout" id="migration-workbench">
+    <section class="wp-workbench">
+      <div class="wp-workbench-top">
+        <div>
+          <h2>Migration Workbench</h2>
+          <p>Switch tabs to generate a Shopify CSV, run direct product sync, or inspect the built-in WooCommerce to Shopify field atlas.</p>
+        </div>
+        <div class="wp-api-tag" id="apiBadge">API base: loading...</div>
+      </div>
 
-  <div id='fields' class='tab-panel'>
-    <h3>Field coverage and mapping (comprehensive common fields)</h3>
-    <table>
-      <thead><tr><th>WooCommerce Field</th><th>Shopify CSV Field</th><th>Logic</th></tr></thead>
-      <tbody id='fieldTable'></tbody>
-    </table>
-  </div>
-</section>
+      <div class="wp-tabs" role="tablist" aria-label="WP to Shopify tool tabs">
+        <button class="wp-tab-btn active" data-tab="convert" role="tab" aria-selected="true">CSV Forge</button>
+        <button class="wp-tab-btn" data-tab="sync" role="tab" aria-selected="false">Live Sync</button>
+        <button class="wp-tab-btn" data-tab="fields" role="tab" aria-selected="false">Mapping Atlas</button>
+      </div>
+
+      <section id="convert" class="wp-tab-panel active" role="tabpanel">
+        <h3>Generate a Shopify product CSV from a WooCommerce export</h3>
+        <p>Use this path when you want a downloadable import file that can be reviewed, adjusted, and uploaded into Shopify on your own schedule.</p>
+
+        <label class="wp-dropzone">
+          <input id="wcCsvFile" class="wp-file-input" type="file" accept=".csv,text/csv">
+          <strong>Select a WooCommerce product CSV</strong>
+          <span>Choose the export you want to convert. The tool keeps the common product, pricing, inventory, SEO, and image fields aligned to Shopify headers.</span>
+        </label>
+
+        <div class="wp-actions-row">
+          <button class="wp-button primary" id="convertBtn" type="button">Generate Shopify CSV</button>
+          <button class="wp-button secondary" id="downloadBtn" type="button" disabled>Download Shopify CSV</button>
+        </div>
+
+        <div class="wp-meta-grid">
+          <div class="wp-meta-box">
+            <strong>Selected file</strong>
+            <span id="convertFileMeta">No WooCommerce CSV selected yet.</span>
+          </div>
+          <div class="wp-meta-box">
+            <strong>Output file</strong>
+            <span>The generated file is named <code>shopify_products_import.csv</code>.</span>
+          </div>
+        </div>
+
+        <pre id="convertLog" class="wp-log">Ready for conversion.</pre>
+      </section>
+
+      <section id="sync" class="wp-tab-panel" role="tabpanel">
+        <h3>Push products directly into Shopify</h3>
+        <p>Use live sync when you already trust the export structure and want the app to create or update products through the Shopify API.</p>
+
+        <div class="wp-form-grid">
+          <div class="wp-field">
+            <label for="shopDomain">Shopify domain</label>
+            <input id="shopDomain" placeholder="your-store.myshopify.com" autocomplete="off">
+          </div>
+          <div class="wp-field">
+            <label for="accessToken">Shopify access token</label>
+            <input id="accessToken" type="password" placeholder="shpat_xxx" autocomplete="off">
+          </div>
+          <div class="wp-field span-2">
+            <label class="wp-dropzone">
+              <input id="syncCsvFile" class="wp-file-input" type="file" accept=".csv,text/csv">
+              <strong>Attach the WooCommerce product CSV used for sync</strong>
+              <span>The same parser used in the CSV conversion flow is used here before the products are sent to Shopify.</span>
+            </label>
+          </div>
+        </div>
+
+        <div class="wp-actions-row">
+          <button class="wp-button warn" id="syncBtn" type="button">Upload and Update Shopify Products</button>
+        </div>
+
+        <div class="wp-meta-grid">
+          <div class="wp-meta-box">
+            <strong>Sync file</strong>
+            <span id="syncFileMeta">No sync CSV selected yet.</span>
+          </div>
+          <div class="wp-meta-box">
+            <strong>Import flow</strong>
+            <span>This button sends the CSV to this app server, and the server calls Shopify Admin APIs to create or update products and attach image URLs from the <code>Images</code> column.</span>
+          </div>
+        </div>
+
+        <pre id="syncLog" class="wp-log">Ready for live sync.</pre>
+      </section>
+
+      <section id="fields" class="wp-tab-panel" role="tabpanel">
+        <h3>WooCommerce to Shopify field atlas</h3>
+        <p>This table is a quick operator reference. It helps you validate what matters before import: title, handle, SKU, price, stock, options, SEO, and media fields.</p>
+
+        <div class="wp-map-card">
+          <div class="wp-map-header">
+            <div>
+              <h3>Field Coverage</h3>
+              <p>Built-in mappings for the most common WooCommerce product export columns.</p>
+            </div>
+            <div class="wp-chip" id="mappingCount">0 mapped fields</div>
+          </div>
+          <div class="wp-table-wrap">
+            <table class="wp-table">
+              <thead>
+                <tr>
+                  <th>WooCommerce Field</th>
+                  <th>Shopify Field</th>
+                  <th>Logic</th>
+                </tr>
+              </thead>
+              <tbody id="fieldTable"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+    </section>
+  </section>
+</main>
+
 <script>
 const appConfig = window.APP_CONFIG || {};
 const mapping = [
-['Name','Title','Direct'],['Description','Body (HTML)','Direct'],['Short description','SEO Description','Fallback'],['SKU','Variant SKU','Direct'],['Regular price','Variant Compare At Price','Direct'],['Sale price','Variant Price','Fallback to Regular price'],['Stock','Variant Inventory Qty','Numeric'],['Categories','Type','First category'],['Tags','Tags','Direct'],['Images','Image Src','First image'],['Weight (kg)','Variant Grams','kg→grams'],['Published','Published','yes/1→TRUE'],['Attribute 1 name','Option1 Name','Direct'],['Attribute 1 value(s)','Option1 Value','Direct'],['Attribute 2 name','Option2 Name','Direct'],['Attribute 2 value(s)','Option2 Value','Direct'],['Attribute 3 name','Option3 Name','Direct'],['Attribute 3 value(s)','Option3 Value','Direct'],['Slug','Handle','fallback from Name'],['Meta: _yoast_wpseo_title','SEO Title','Direct']
+  ["Name", "Title", "Direct"],
+  ["Description", "Body (HTML)", "Direct"],
+  ["Short description", "SEO Description", "Fallback"],
+  ["SKU", "Variant SKU", "Direct"],
+  ["Regular price", "Variant Compare At Price", "Direct"],
+  ["Sale price", "Variant Price", "Fallback to Regular price"],
+  ["Stock", "Variant Inventory Qty", "Numeric"],
+  ["Categories", "Type", "First category"],
+  ["Tags", "Tags", "Direct"],
+  ["Images", "Image Src", "First image"],
+  ["Weight (kg)", "Variant Grams", "kg to grams"],
+  ["Published", "Published", "yes or 1 to TRUE"],
+  ["Attribute 1 name", "Option1 Name", "Direct"],
+  ["Attribute 1 value(s)", "Option1 Value", "Direct"],
+  ["Attribute 2 name", "Option2 Name", "Direct"],
+  ["Attribute 2 value(s)", "Option2 Value", "Direct"],
+  ["Attribute 3 name", "Option3 Name", "Direct"],
+  ["Attribute 3 value(s)", "Option3 Value", "Direct"],
+  ["Slug", "Handle", "Fallback from Name"],
+  ["Meta: _yoast_wpseo_title", "SEO Title", "Direct"]
 ];
-const shopifyHeaders = ['Handle','Title','Body (HTML)','Vendor','Type','Tags','Published','Option1 Name','Option1 Value','Option2 Name','Option2 Value','Option3 Name','Option3 Value','Variant SKU','Variant Grams','Variant Inventory Tracker','Variant Inventory Qty','Variant Inventory Policy','Variant Fulfillment Service','Variant Price','Variant Compare At Price','Variant Requires Shipping','Variant Taxable','Variant Barcode','Image Src','Image Position','Image Alt Text','Gift Card','SEO Title','SEO Description','Google Shopping / Google Product Category','Google Shopping / Gender','Google Shopping / Age Group','Google Shopping / MPN','Google Shopping / Condition','Google Shopping / Custom Product','Google Shopping / Custom Label 0','Google Shopping / Custom Label 1','Google Shopping / Custom Label 2','Google Shopping / Custom Label 3','Google Shopping / Custom Label 4','Variant Image','Variant Weight Unit','Status'];
-let convertedCsv = '';
+const shopifyHeaders = [
+  "Handle", "Title", "Body (HTML)", "Vendor", "Type", "Tags", "Published",
+  "Option1 Name", "Option1 Value", "Option2 Name", "Option2 Value", "Option3 Name", "Option3 Value",
+  "Variant SKU", "Variant Grams", "Variant Inventory Tracker", "Variant Inventory Qty",
+  "Variant Inventory Policy", "Variant Fulfillment Service", "Variant Price",
+  "Variant Compare At Price", "Variant Requires Shipping", "Variant Taxable", "Variant Barcode",
+  "Image Src", "Image Position", "Image Alt Text", "Gift Card", "SEO Title", "SEO Description",
+  "Google Shopping / Google Product Category", "Google Shopping / Gender",
+  "Google Shopping / Age Group", "Google Shopping / MPN", "Google Shopping / Condition",
+  "Google Shopping / Custom Product", "Google Shopping / Custom Label 0",
+  "Google Shopping / Custom Label 1", "Google Shopping / Custom Label 2",
+  "Google Shopping / Custom Label 3", "Google Shopping / Custom Label 4",
+  "Variant Image", "Variant Weight Unit", "Status"
+];
 
-function parseCSV(text){
-  const rows=[];let row=[],cell='',q=false;
-  for(let i=0;i<text.length;i++){const c=text[i],n=text[i+1];
-    if(c==='"'){if(q&&n==='"'){cell+='"';i++;}else{q=!q;}}
-    else if(c===','&&!q){row.push(cell);cell='';}
-    else if((c==='\n'||c==='\r')&&!q){if(c==='\r'&&n==='\n')i++;row.push(cell);rows.push(row);row=[];cell='';}
-    else cell+=c;
+let convertedCsv = "";
+
+function parseCSV(text) {
+  const rows = [];
+  let row = [];
+  let cell = "";
+  let quoted = false;
+
+  for (let index = 0; index < text.length; index += 1) {
+    const char = text[index];
+    const next = text[index + 1];
+
+    if (char === "\"") {
+      if (quoted && next === "\"") {
+        cell += "\"";
+        index += 1;
+      } else {
+        quoted = !quoted;
+      }
+      continue;
+    }
+
+    if (char === "," && !quoted) {
+      row.push(cell);
+      cell = "";
+      continue;
+    }
+
+    if ((char === "\n" || char === "\r") && !quoted) {
+      if (char === "\r" && next === "\n") {
+        index += 1;
+      }
+      row.push(cell);
+      rows.push(row);
+      row = [];
+      cell = "";
+      continue;
+    }
+
+    cell += char;
   }
-  if(cell.length||row.length){row.push(cell);rows.push(row);}return rows;
+
+  if (cell.length || row.length) {
+    row.push(cell);
+    rows.push(row);
+  }
+
+  return rows;
 }
-function csvEscape(v){const s=String(v??'');return /[",\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s;}
-function buildApiUrl(path){
-  const cleanPath = path.startsWith('/') ? path : ('/' + path);
-  const base = String(appConfig.defaultApiBaseUrl || window.location.origin || '').trim().replace(/\/+$/,'');
+
+function csvEscape(value) {
+  const text = String(value ?? "");
+  return /[",\n]/.test(text) ? "\"" + text.replace(/"/g, "\"\"") + "\"" : text;
+}
+
+function buildApiUrl(path) {
+  const cleanPath = path.startsWith("/") ? path : ("/" + path);
+  const base = String(appConfig.defaultApiBaseUrl || window.location.origin || "").trim().replace(/\/+$/, "");
   return base ? (base + cleanPath) : cleanPath;
 }
-function wcToShopifyRow(w){
-  const handle=(w['Slug']||w['Name']||'product').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');
+
+function formatFileSize(bytes) {
+  const size = Number(bytes || 0);
+  if (size >= 1024 * 1024) {
+    return (size / (1024 * 1024)).toFixed(2) + " MB";
+  }
+  if (size >= 1024) {
+    return (size / 1024).toFixed(1) + " KB";
+  }
+  return size + " B";
+}
+
+function setLogState(element, message, tone) {
+  element.textContent = message;
+  element.classList.remove("is-error", "is-success");
+  if (tone === "error") {
+    element.classList.add("is-error");
+  } else if (tone === "success") {
+    element.classList.add("is-success");
+  }
+}
+
+function updateFileMeta(inputId, targetId, fallbackText) {
+  const input = document.getElementById(inputId);
+  const target = document.getElementById(targetId);
+  const file = input.files && input.files[0];
+
+  if (!file) {
+    target.textContent = fallbackText;
+    return;
+  }
+
+  target.textContent = file.name + " | " + formatFileSize(file.size);
+}
+
+function wcToShopifyRow(sourceRow) {
+  const handle = (sourceRow["Slug"] || sourceRow["Name"] || "product")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
+
   return {
-    'Handle':handle,'Title':w['Name']||'','Body (HTML)':w['Description']||'','Vendor':w['Brands']||'','Type':(w['Categories']||'').split(',')[0]?.trim()||'','Tags':w['Tags']||'','Published':(['1','yes','true'].includes(String(w['Published']||'').toLowerCase())?'TRUE':'FALSE'),'Option1 Name':w['Attribute 1 name']||'Title','Option1 Value':w['Attribute 1 value(s)']||'Default Title','Option2 Name':w['Attribute 2 name']||'','Option2 Value':w['Attribute 2 value(s)']||'','Option3 Name':w['Attribute 3 name']||'','Option3 Value':w['Attribute 3 value(s)']||'','Variant SKU':w['SKU']||'','Variant Grams':Math.round((parseFloat(w['Weight (kg)']||'0')||0)*1000),'Variant Inventory Tracker':'shopify','Variant Inventory Qty':Number(w['Stock']||0)||0,'Variant Inventory Policy':'deny','Variant Fulfillment Service':'manual','Variant Price':w['Sale price']||w['Regular price']||'0','Variant Compare At Price':w['Regular price']||'','Variant Requires Shipping':'TRUE','Variant Taxable':'TRUE','Variant Barcode':w['GTIN, UPC, EAN, or ISBN']||'','Image Src':(w['Images']||'').split(',')[0]?.trim()||'','Image Position':'1','Image Alt Text':w['Name']||'','Gift Card':'FALSE','SEO Title':w['Meta: _yoast_wpseo_title']||w['Name']||'','SEO Description':w['Meta: _yoast_wpseo_metadesc']||w['Short description']||'','Google Shopping / Google Product Category':'','Google Shopping / Gender':'','Google Shopping / Age Group':'','Google Shopping / MPN':w['Meta: _wc_gpf_mpn']||'','Google Shopping / Condition':'new','Google Shopping / Custom Product':'FALSE','Google Shopping / Custom Label 0':'','Google Shopping / Custom Label 1':'','Google Shopping / Custom Label 2':'','Google Shopping / Custom Label 3':'','Google Shopping / Custom Label 4':'','Variant Image':'','Variant Weight Unit':'kg','Status':'active'
+    "Handle": handle,
+    "Title": sourceRow["Name"] || "",
+    "Body (HTML)": sourceRow["Description"] || "",
+    "Vendor": sourceRow["Brands"] || "",
+    "Type": (sourceRow["Categories"] || "").split(",")[0]?.trim() || "",
+    "Tags": sourceRow["Tags"] || "",
+    "Published": ["1", "yes", "true"].includes(String(sourceRow["Published"] || "").toLowerCase()) ? "TRUE" : "FALSE",
+    "Option1 Name": sourceRow["Attribute 1 name"] || "Title",
+    "Option1 Value": sourceRow["Attribute 1 value(s)"] || "Default Title",
+    "Option2 Name": sourceRow["Attribute 2 name"] || "",
+    "Option2 Value": sourceRow["Attribute 2 value(s)"] || "",
+    "Option3 Name": sourceRow["Attribute 3 name"] || "",
+    "Option3 Value": sourceRow["Attribute 3 value(s)"] || "",
+    "Variant SKU": sourceRow["SKU"] || "",
+    "Variant Grams": Math.round((parseFloat(sourceRow["Weight (kg)"] || "0") || 0) * 1000),
+    "Variant Inventory Tracker": "shopify",
+    "Variant Inventory Qty": Number(sourceRow["Stock"] || 0) || 0,
+    "Variant Inventory Policy": "deny",
+    "Variant Fulfillment Service": "manual",
+    "Variant Price": sourceRow["Sale price"] || sourceRow["Regular price"] || "0",
+    "Variant Compare At Price": sourceRow["Regular price"] || "",
+    "Variant Requires Shipping": "TRUE",
+    "Variant Taxable": "TRUE",
+    "Variant Barcode": sourceRow["GTIN, UPC, EAN, or ISBN"] || "",
+    "Image Src": (sourceRow["Images"] || "").split(",")[0]?.trim() || "",
+    "Image Position": "1",
+    "Image Alt Text": sourceRow["Name"] || "",
+    "Gift Card": "FALSE",
+    "SEO Title": sourceRow["Meta: _yoast_wpseo_title"] || sourceRow["Name"] || "",
+    "SEO Description": sourceRow["Meta: _yoast_wpseo_metadesc"] || sourceRow["Short description"] || "",
+    "Google Shopping / Google Product Category": "",
+    "Google Shopping / Gender": "",
+    "Google Shopping / Age Group": "",
+    "Google Shopping / MPN": sourceRow["Meta: _wc_gpf_mpn"] || "",
+    "Google Shopping / Condition": "new",
+    "Google Shopping / Custom Product": "FALSE",
+    "Google Shopping / Custom Label 0": "",
+    "Google Shopping / Custom Label 1": "",
+    "Google Shopping / Custom Label 2": "",
+    "Google Shopping / Custom Label 3": "",
+    "Google Shopping / Custom Label 4": "",
+    "Variant Image": "",
+    "Variant Weight Unit": "kg",
+    "Status": "active"
+  };
+}
+
+function switchTab(nextTab) {
+  document.querySelectorAll(".wp-tab-btn").forEach((button) => {
+    const active = button.dataset.tab === nextTab;
+    button.classList.toggle("active", active);
+    button.setAttribute("aria-selected", active ? "true" : "false");
+  });
+
+  document.querySelectorAll(".wp-tab-panel").forEach((panel) => {
+    panel.classList.toggle("active", panel.id === nextTab);
+  });
+}
+
+document.querySelectorAll(".wp-tab-btn").forEach((button) => {
+  button.addEventListener("click", () => switchTab(button.dataset.tab));
+});
+
+document.getElementById("fieldTable").innerHTML = mapping.map((row) =>
+  "<tr><td>" + row[0] + "</td><td>" + row[1] + "</td><td>" + row[2] + "</td></tr>"
+).join("");
+
+document.getElementById("mappingCount").textContent = mapping.length + " mapped fields";
+
+document.getElementById("apiBadge").textContent = "API base: " + String(appConfig.defaultApiBaseUrl || window.location.origin || "Not available");
+document.getElementById("wcCsvFile").addEventListener("change", () => {
+  updateFileMeta("wcCsvFile", "convertFileMeta", "No WooCommerce CSV selected yet.");
+});
+
+document.getElementById("syncCsvFile").addEventListener("change", () => {
+  updateFileMeta("syncCsvFile", "syncFileMeta", "No sync CSV selected yet.");
+});
+
+document.getElementById("convertBtn").addEventListener("click", async () => {
+  const file = document.getElementById("wcCsvFile").files[0];
+  if (!file) {
+    setLogState(document.getElementById("convertLog"), "Select a WooCommerce CSV first.", "error");
+    return;
   }
-}
 
-document.querySelectorAll('.tab-btn').forEach(b=>b.onclick=()=>{document.querySelectorAll('.tab-btn').forEach(x=>x.classList.remove('active'));document.querySelectorAll('.tab-panel').forEach(x=>x.classList.remove('active'));b.classList.add('active');document.getElementById(b.dataset.tab).classList.add('active');});
-document.getElementById('fieldTable').innerHTML=mapping.map(m=>`<tr><td>${m[0]}</td><td>${m[1]}</td><td>${m[2]}</td></tr>`).join('');
+  try {
+    const text = await file.text();
+    const rows = parseCSV(text);
+    const headers = rows[0] || [];
+    const objects = rows
+      .slice(1)
+      .filter((row) => row.some((value) => String(value).trim()))
+      .map((row) => Object.fromEntries(headers.map((header, index) => [header, row[index] || ""])));
 
-document.getElementById('convertBtn').onclick=async()=>{
-  const f=document.getElementById('wcCsvFile').files[0]; if(!f)return alert('Select WooCommerce CSV first');
-  const t=await f.text(); const rows=parseCSV(t); const headers=rows[0]||[];
-  const objects=rows.slice(1).filter(r=>r.some(v=>String(v).trim())).map(r=>Object.fromEntries(headers.map((h,i)=>[h,r[i]||''])));
-  const out=[shopifyHeaders.join(',')];
-  objects.forEach(o=>{const s=wcToShopifyRow(o);out.push(shopifyHeaders.map(h=>csvEscape(s[h]||'')).join(','));});
-  convertedCsv=out.join('\n');
-  document.getElementById('downloadBtn').disabled=false;
-  document.getElementById('convertLog').textContent=`Converted ${objects.length} product rows to Shopify CSV.`;
-}
+    const output = [shopifyHeaders.join(",")];
+    objects.forEach((product) => {
+      const converted = wcToShopifyRow(product);
+      output.push(shopifyHeaders.map((header) => csvEscape(converted[header] || "")).join(","));
+    });
 
-document.getElementById('downloadBtn').onclick=()=>{
-  const blob=new Blob([convertedCsv],{type:'text/csv;charset=utf-8;'}); const a=document.createElement('a');
-  a.href=URL.createObjectURL(blob); a.download='shopify_products_import.csv'; a.click();
-};
-
-document.getElementById('syncBtn').onclick=async()=>{
-  const domain=document.getElementById('shopDomain').value.trim();
-  const token=document.getElementById('accessToken').value.trim();
-  const f=document.getElementById('syncCsvFile').files[0]; if(!domain||!token||!f)return alert('Enter domain, token, and CSV file');
-  try{
-    const t=await f.text(); const rows=parseCSV(t); const headers=rows[0]||[];
-    const products=rows.slice(1).filter(r=>r.some(v=>String(v).trim())).map(r=>Object.fromEntries(headers.map((h,i)=>[h,r[i]||''])));
-    const res=await fetch(buildApiUrl('/api/products/sync'),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({shopDomain:domain,accessToken:token,products})});
-    const data=await res.json();
-    document.getElementById('syncLog').textContent = data.ok ? `Sync done. Created: ${data.summary.created}, Updated: ${data.summary.updated}, Failed: ${data.summary.failed}` : `Error: ${data.error}`;
-  }catch(error){
-    document.getElementById('syncLog').textContent = `Error: ${error.message}`;
+    convertedCsv = output.join("\n");
+    document.getElementById("downloadBtn").disabled = false;
+    setLogState(
+      document.getElementById("convertLog"),
+      "Converted " + objects.length + " product rows into a Shopify import CSV.\nOutput: shopify_products_import.csv",
+      "success"
+    );
+  } catch (error) {
+    setLogState(document.getElementById("convertLog"), "Conversion failed: " + error.message, "error");
   }
-}
+});
+
+document.getElementById("downloadBtn").addEventListener("click", () => {
+  if (!convertedCsv) {
+    return;
+  }
+
+  const blob = new Blob([convertedCsv], { type: "text/csv;charset=utf-8;" });
+  const link = document.createElement("a");
+  link.href = URL.createObjectURL(blob);
+  link.download = "shopify_products_import.csv";
+  link.click();
+});
+
+document.getElementById("syncBtn").addEventListener("click", async () => {
+  const domain = document.getElementById("shopDomain").value.trim();
+  const token = document.getElementById("accessToken").value.trim();
+  const file = document.getElementById("syncCsvFile").files[0];
+
+  if (!domain || !token || !file) {
+    setLogState(document.getElementById("syncLog"), "Enter the Shopify domain, access token, and CSV file before syncing.", "error");
+    return;
+  }
+
+  setLogState(document.getElementById("syncLog"), "Preparing products and sending them to Shopify...", "");
+
+  try {
+    const response = await fetch(buildApiUrl("/api/woocommerce/shopify-sync-products"), {
+      method: "POST",
+      headers: {
+        "Content-Type": file.type || "text/csv",
+        "X-Shop-Domain": domain,
+        "X-Shopify-Access-Token": token
+      },
+      body: file
+    });
+
+    const data = await response.json();
+    if (!response.ok || !data.ok) {
+      throw new Error(data.error || "Sync request failed.");
+    }
+
+    setLogState(
+      document.getElementById("syncLog"),
+      "Sync completed.\nCreated: " + data.summary.created + "\nUpdated: " + data.summary.updated + "\nFailed: " + data.summary.failed,
+      "success"
+    );
+  } catch (error) {
+    setLogState(document.getElementById("syncLog"), "Sync failed: " + error.message, "error");
+  }
+});
 </script>
 </body>
 </html>

@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Help & FAQ | ShopifyMigrate</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/assets/css/saas-platform.css">
+  <script src="/assets/js/saas-platform.js" defer></script>
+</head>
+<body class="platform-body">
+  <div class="top-banner">Guidance for CSV uploads, Shopify credentials, jobs, and deployment setup.</div>
+  <header class="site-header">
+    <div class="site-header-inner">
+      <a class="brand" href="/"><span class="brand-mark">SM</span><span class="brand-copy"><strong>ShopifyMigrate</strong><span>Help center and workflow support</span></span></a>
+      <nav class="site-nav">
+        <div class="site-nav-links">
+          <a href="/" data-route="/">Home</a>
+          <a href="/pricing" data-route="/pricing">Pricing</a>
+          <a href="/help" data-route="/help">Help</a>
+          <a href="/dashboard" data-route="/dashboard" data-route-prefix>Dashboard</a>
+          <a href="/admin" data-route="/admin" data-route-prefix>Admin</a>
+        </div>
+        <div class="site-nav-cta">
+          <a class="button-link secondary" href="/login">Log in</a>
+          <a class="button-link primary" href="/odoo-migration">Start migration</a>
+        </div>
+        <button class="nav-toggle" type="button" aria-label="Open menu" aria-expanded="false" data-nav-toggle>☰</button>
+      </nav>
+    </div>
+    <div class="mobile-nav" data-mobile-nav>
+      <div class="mobile-nav-inner">
+        <a href="/">Home</a>
+        <a href="/pricing">Pricing</a>
+        <a href="/help">Help</a>
+        <a href="/dashboard">Dashboard</a>
+        <a href="/admin">Admin</a>
+        <div class="nav-actions">
+          <a class="button-link secondary" href="/login">Log in</a>
+          <a class="button-link primary" href="/odoo-migration">Start migration</a>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main class="page-shell">
+    <section class="page-hero">
+      <article class="page-hero-main">
+        <span class="eyebrow">Help center</span>
+        <h1 class="hero-title">Find answers for uploads, Shopify access, jobs, and Render deployment.</h1>
+        <p class="hero-copy">This page is tailored to the real behavior of your project, including local `.env` runtime config, Shopify Admin API connections, CSV preparation, job tracking, and admin setup.</p>
+      </article>
+      <aside class="page-hero-side">
+        <span class="eyebrow inverse">Need quick direction?</span>
+        <ul class="detail-list">
+          <li>Use `/odoo-migration` for order-focused Matrixify preparation.</li>
+          <li>Use `/woocommerce-migration` for product CSV conversion and direct import.</li>
+          <li>Use `/admin` to verify environment and deployment readiness.</li>
+        </ul>
+      </aside>
+    </section>
+
+    <section class="page-section panel">
+      <div class="field">
+        <label for="helpSearch">Search the common questions below</label>
+        <input id="helpSearch" type="search" placeholder="Search for Shopify token, Render, CSV images, admin session...">
+      </div>
+    </section>
+
+    <section class="page-section content-grid cols-3">
+      <article class="icon-card">
+        <span class="icon-badge">CSV</span>
+        <div>
+          <h2 class="card-title">Upload guidance</h2>
+          <p class="card-copy">Make sure exports are true CSV files and not spreadsheet links or partial tabular copies.</p>
+        </div>
+      </article>
+      <article class="icon-card">
+        <span class="icon-badge">API</span>
+        <div>
+          <h2 class="card-title">Shopify credentials</h2>
+          <p class="card-copy">Use the `your-store.myshopify.com` domain and a valid Admin API token with the scopes required by the route you are using.</p>
+        </div>
+      </article>
+      <article class="icon-card">
+        <span class="icon-badge">ENV</span>
+        <div>
+          <h2 class="card-title">Local vs Render</h2>
+          <p class="card-copy">Local uses `.env`; Render uses environment variables from the dashboard or blueprint.</p>
+        </div>
+      </article>
+    </section>
+
+    <section class="page-section panel">
+      <div class="section-heading">
+        <span class="eyebrow">Frequently asked questions</span>
+        <h2 class="section-title">Answers grounded in this project’s current behavior</h2>
+      </div>
+      <div class="faq-list" id="helpFaqList">
+        <div class="faq-item" data-faq-text="odoo orders csv matrixify download mapping preview import">
+          <button class="faq-toggle" data-faq-toggle type="button">How do I migrate Odoo orders to Shopify?<span>+</span></button>
+          <div class="faq-answer">Open `/odoo-migration`, connect your Shopify store, upload the Odoo CSV, preview the transformed data, then either download the generated files or start the import job directly from the interface.</div>
+        </div>
+        <div class="faq-item" data-faq-text="woocommerce products csv images import direct shopify">
+          <button class="faq-toggle" data-faq-toggle type="button">How does the WooCommerce product import work?<span>+</span></button>
+          <div class="faq-answer">The dedicated WooCommerce page accepts a product export CSV, converts the fields to Shopify format, and can call the server endpoint that creates or updates Shopify products. Public image URLs in the `Images` column can also be attached during import.</div>
+        </div>
+        <div class="faq-item" data-faq-text="render deploy env base url local configuration">
+          <button class="faq-toggle" data-faq-toggle type="button">What should I configure for Render?<span>+</span></button>
+          <div class="faq-answer">Push the repository with `render.yaml`, then set environment values like `ADMIN_EMAIL`, `ADMIN_PASSWORD`, and any Stripe keys you want to use. The app already reads `process.env.PORT` and serves runtime config to the frontend.</div>
+        </div>
+        <div class="faq-item" data-faq-text="local env port 3460 api base url">
+          <button class="faq-toggle" data-faq-toggle type="button">How do I run the project locally?<span>+</span></button>
+          <div class="faq-answer">Create or update `.env`, set a free `PORT` such as `3460`, point `LOCAL_API_BASE_URL`, `DEFAULT_API_BASE_URL`, and `PUBLIC_BASE_URL` to that local address, then run `npm start`.</div>
+        </div>
+        <div class="faq-item" data-faq-text="admin login session secret environment">
+          <button class="faq-toggle" data-faq-toggle type="button">How does admin access work now?<span>+</span></button>
+          <div class="faq-answer">Admin login is server-backed. Credentials are read from environment variables, and the browser receives a signed session cookie instead of storing the admin password locally.</div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="site-footer-inner">
+      <div class="footer-bottom">
+        <span>&copy; <span data-current-year></span> ShopifyMigrate.</span>
+        <span>Workflow help for migration and deployment.</span>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    document.addEventListener("DOMContentLoaded", function () {
+      var searchInput = document.getElementById("helpSearch");
+      var items = Array.prototype.slice.call(document.querySelectorAll("#helpFaqList .faq-item"));
+
+      function applyFilter() {
+        var query = String(searchInput.value || "").trim().toLowerCase();
+        items.forEach(function (item) {
+          var text = String(item.getAttribute("data-faq-text") || "").toLowerCase();
+          item.classList.toggle("hidden", Boolean(query) && text.indexOf(query) === -1);
+        });
+      }
+
+      searchInput.addEventListener("input", applyFilter);
+    });
+  </script>
+</body>
+</html>

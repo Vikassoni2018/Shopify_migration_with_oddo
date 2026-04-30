@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Dashboard | ShopifyMigrate</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/assets/css/saas-platform.css">
+  <script src="/assets/js/saas-platform.js" defer></script>
+</head>
+<body class="platform-body">
+  <div class="top-banner">Workspace overview for migrations, jobs, and routes.</div>
+  <main class="page-shell">
+    <div class="dashboard-layout">
+      <aside class="dashboard-sidebar">
+        <div class="sidebar-copy">
+          <a class="brand" href="/"><span class="brand-mark">SM</span><span class="brand-copy"><strong>ShopifyMigrate</strong><span>Operator dashboard</span></span></a>
+        </div>
+        <nav class="sidebar-nav">
+          <a href="/dashboard" data-route="/dashboard"><span class="nav-icon">D</span>Dashboard</a>
+          <a href="/dashboard/odoo" data-route="/dashboard/odoo"><span class="nav-icon">O</span>Odoo Migration</a>
+          <a href="/dashboard/woocommerce" data-route="/dashboard/woocommerce"><span class="nav-icon">W</span>WooCommerce</a>
+          <a href="/dashboard/odoo-panel" data-route="/dashboard/odoo-panel"><span class="nav-icon">I</span>Import Workspace</a>
+          <a href="/dashboard/messages" data-route="/dashboard/messages"><span class="nav-icon">M</span>Messages</a>
+          <a href="/admin"><span class="nav-icon">A</span>Admin</a>
+        </nav>
+      </aside>
+
+      <section class="dashboard-main">
+        <article class="panel">
+          <div class="toolbar">
+            <div>
+              <span class="eyebrow">Dashboard</span>
+              <h1 class="section-title" id="dashboardGreeting">Welcome back.</h1>
+              <p class="section-subtitle" id="dashboardSubtext">Use the quick actions below to jump into the exact migration route you need.</p>
+            </div>
+            <div class="toolbar-actions">
+              <a class="button-link primary" href="/odoo-migration">Odoo flow</a>
+              <a class="button-link secondary" href="/woocommerce-migration">WooCommerce flow</a>
+            </div>
+          </div>
+        </article>
+
+        <section class="dashboard-metrics">
+          <div class="metric-card"><span class="metric-value" id="metricEnvironment">development</span><span class="metric-label">Runtime environment</span></div>
+          <div class="metric-card"><span class="metric-value" id="metricApiBase">local</span><span class="metric-label">API base target</span></div>
+          <div class="metric-card"><span class="metric-value">2</span><span class="metric-label">Primary migration routes</span></div>
+        </section>
+
+        <section class="content-grid cols-2">
+          <article class="panel">
+            <span class="eyebrow">Quick actions</span>
+            <div class="button-row">
+              <a class="button-link primary" href="/odoo-migration">Start Odoo migration</a>
+              <a class="button-link secondary" href="/woocommerce-migration">Start WooCommerce migration</a>
+              <a class="button-link ghost" href="/pricing">Review pricing</a>
+            </div>
+          </article>
+
+          <article class="panel">
+            <span class="eyebrow">Workspace notes</span>
+            <ul class="detail-list">
+              <li>Odoo flow handles order preparation, mapping, previews, and tracked imports.</li>
+              <li>WooCommerce flow handles product conversion, direct Shopify sync, and image URLs.</li>
+              <li>Admin panel shows environment config, jobs, payments, and store entitlements.</li>
+            </ul>
+          </article>
+        </section>
+
+        <section class="table-card">
+          <div class="table-header">
+            <div>
+              <span class="eyebrow">Routes</span>
+              <h2 class="card-title">Primary work areas</h2>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Area</th>
+                  <th>Purpose</th>
+                  <th>Route</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>Odoo Migration</td>
+                  <td>Prepare orders for Matrixify and import into Shopify.</td>
+                  <td><code>/odoo-migration</code></td>
+                  <td><a href="/odoo-migration">Open</a></td>
+                </tr>
+                <tr>
+                  <td>WooCommerce Migration</td>
+                  <td>Convert WooCommerce product CSV and sync products into Shopify.</td>
+                  <td><code>/woocommerce-migration</code></td>
+                  <td><a href="/woocommerce-migration">Open</a></td>
+                </tr>
+                <tr>
+                  <td>Messages</td>
+                  <td>Review workflow notes, status reminders, and operator next steps.</td>
+                  <td><code>/dashboard/messages</code></td>
+                  <td><a href="/dashboard/messages">Open</a></td>
+                </tr>
+                <tr>
+                  <td>Admin</td>
+                  <td>Check runtime settings, entitlements, jobs, and deployment readiness.</td>
+                  <td><code>/admin</code></td>
+                  <td><a href="/admin">Open</a></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </section>
+    </div>
+  </main>
+
+  <script>
+    document.addEventListener("DOMContentLoaded", function () {
+      var profileText = sessionStorage.getItem("platformSignupProfile");
+      var profile = {};
+
+      try {
+        profile = profileText ? JSON.parse(profileText) : {};
+      } catch (error) {
+        profile = {};
+      }
+
+      var greeting = document.getElementById("dashboardGreeting");
+      var subtext = document.getElementById("dashboardSubtext");
+      var name = profile.firstName || "operator";
+      greeting.textContent = "Welcome back, " + name + ".";
+      if (profile.storeName) {
+        subtext.textContent = "Workspace ready for " + profile.storeName + ". Choose the migration route that matches the data you are moving.";
+      }
+
+      var config = PlatformApp.getAppConfig();
+      document.getElementById("metricEnvironment").textContent = config.environment || "development";
+      document.getElementById("metricApiBase").textContent = config.defaultApiBaseUrl || config.localApiBaseUrl || "local";
+    });
+  </script>
+</body>
+</html>

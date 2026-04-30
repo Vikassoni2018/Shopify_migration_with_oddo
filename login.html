@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Log In | ShopifyMigrate</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/assets/css/saas-platform.css">
+  <script src="/assets/js/saas-platform.js" defer></script>
+</head>
+<body class="platform-body">
+  <div class="top-banner">Admin login is environment-backed and server-validated.</div>
+  <header class="site-header">
+    <div class="site-header-inner">
+      <a class="brand" href="/"><span class="brand-mark">SM</span><span class="brand-copy"><strong>ShopifyMigrate</strong><span>Protected operations and workspace access</span></span></a>
+      <nav class="site-nav">
+        <div class="site-nav-links">
+          <a href="/" data-route="/">Home</a>
+          <a href="/pricing" data-route="/pricing">Pricing</a>
+          <a href="/help" data-route="/help">Help</a>
+        </div>
+        <div class="site-nav-cta">
+          <a class="button-link secondary" href="/signup">Create account</a>
+          <a class="button-link primary" href="/dashboard">Dashboard preview</a>
+        </div>
+        <button class="nav-toggle" type="button" aria-label="Open menu" aria-expanded="false" data-nav-toggle>☰</button>
+      </nav>
+    </div>
+    <div class="mobile-nav" data-mobile-nav>
+      <div class="mobile-nav-inner">
+        <a href="/">Home</a>
+        <a href="/pricing">Pricing</a>
+        <a href="/help">Help</a>
+        <div class="nav-actions">
+          <a class="button-link secondary" href="/signup">Create account</a>
+          <a class="button-link primary" href="/dashboard">Dashboard preview</a>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main class="page-shell auth-shell">
+    <section class="auth-wrap">
+      <article class="auth-card dark">
+        <span class="eyebrow">Secure access</span>
+        <h1 class="auth-title">Use server-backed admin credentials for protected controls.</h1>
+        <p class="muted">The admin panel reads its credentials from your environment configuration and returns a signed session cookie. For regular UI exploration, you can open the dashboard preview without logging in.</p>
+        <ul class="check-list">
+          <li>Signed admin session cookie</li>
+          <li>No browser-stored admin password</li>
+          <li>Environment-driven config visibility</li>
+        </ul>
+      </article>
+
+      <article class="auth-card">
+        <span class="eyebrow">Admin log in</span>
+        <h2 class="card-title">Enter the admin credentials configured on the server</h2>
+        <form class="form-stack" id="loginForm">
+          <div class="field">
+            <label for="email">Admin email</label>
+            <input id="email" type="email" placeholder="admin@example.com" autocomplete="username">
+          </div>
+          <div class="field">
+            <label for="password">Admin password</label>
+            <input id="password" type="password" placeholder="Enter your server-backed password" autocomplete="current-password">
+          </div>
+          <div class="button-row">
+            <button class="button primary" type="submit">Log in to admin</button>
+            <a class="button-link secondary" href="/dashboard">Open dashboard preview</a>
+          </div>
+          <div class="status-message info" id="loginStatus">Use the same `ADMIN_EMAIL` and `ADMIN_PASSWORD` values configured in `.env` or on Render.</div>
+        </form>
+      </article>
+    </section>
+  </main>
+
+  <script>
+    document.addEventListener("DOMContentLoaded", function () {
+      var form = document.getElementById("loginForm");
+      var status = document.getElementById("loginStatus");
+      var email = document.getElementById("email");
+      var password = document.getElementById("password");
+
+      form.addEventListener("submit", async function (event) {
+        event.preventDefault();
+        status.className = "status-message info";
+        status.textContent = "Signing in...";
+
+        try {
+          await PlatformApp.requestJson("/api/admin/login", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              email: email.value,
+              password: password.value
+            })
+          });
+
+          status.className = "status-message success";
+          status.textContent = "Login successful. Redirecting to the admin workspace...";
+          window.setTimeout(function () {
+            window.location.href = "/admin";
+          }, 500);
+        } catch (error) {
+          status.className = "status-message error";
+          status.textContent = error.message;
+        }
+      });
+    });
+  </script>
+</body>
+</html>

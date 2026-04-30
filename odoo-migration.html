@@ -1,9 +1,152 @@
 <!doctype html>
-<html lang='en'>
-<head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><title>Odoo Migration</title><link rel='stylesheet' href='/assets/css/frontend.css'></head>
-<body>
-<div class='topbar'>Dedicated Odoo migration page.</div>
-<header class='header'><div class='brand'>Migration Portal</div><nav class='nav'><a href='/'>Home</a><a href='/odoo-migration'>Odoo Migration</a><a href='/woocommerce-migration'>WooCommerce Migration</a><a href='/migration-tool'>Migration Tool</a><a href='/admin'>Admin</a></nav></header>
-<section class='container'><h2 class='section-title'>Odoo → Shopify Migration</h2><p class='section-sub'>Upload Odoo CSV exports, validate mappings, and import into Shopify using the Matrixify-compatible workflow.</p><iframe src='/migration-tool' title='Odoo Migration Tool'></iframe></section>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Odoo Migration | ShopifyMigrate</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/assets/css/saas-platform.css">
+  <script src="/assets/js/saas-platform.js" defer></script>
+</head>
+<body class="platform-body">
+  <div class="top-banner">Odoo to Shopify order workflow with Matrixify-compatible preparation and tracked import jobs.</div>
+
+  <header class="site-header">
+    <div class="site-header-inner">
+      <a class="brand" href="/"><span class="brand-mark">SM</span><span class="brand-copy"><strong>ShopifyMigrate</strong><span>Odoo migration workspace</span></span></a>
+      <nav class="site-nav">
+        <div class="site-nav-links">
+          <a href="/" data-route="/">Home</a>
+          <a href="/pricing" data-route="/pricing">Pricing</a>
+          <a href="/help" data-route="/help">Help</a>
+          <a href="/dashboard" data-route="/dashboard" data-route-prefix>Dashboard</a>
+          <a href="/admin" data-route="/admin" data-route-prefix>Admin</a>
+        </div>
+        <div class="site-nav-cta">
+          <a class="button-link secondary" href="/woocommerce-migration">WooCommerce flow</a>
+          <a class="button-link primary" href="/dashboard/odoo-panel">Import workspace</a>
+        </div>
+        <button class="nav-toggle" type="button" aria-label="Open menu" aria-expanded="false" data-nav-toggle>☰</button>
+      </nav>
+    </div>
+    <div class="mobile-nav" data-mobile-nav>
+      <div class="mobile-nav-inner">
+        <a href="/">Home</a>
+        <a href="/pricing">Pricing</a>
+        <a href="/help">Help</a>
+        <a href="/dashboard">Dashboard</a>
+        <a href="/admin">Admin</a>
+        <div class="nav-actions">
+          <a class="button-link secondary" href="/woocommerce-migration">WooCommerce flow</a>
+          <a class="button-link primary" href="/dashboard/odoo-panel">Import workspace</a>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main class="page-shell">
+    <section class="page-hero">
+      <article class="page-hero-main">
+        <span class="eyebrow">Odoo workflow</span>
+        <h1 class="hero-title">Prepare orders, review mapping, and import into Shopify from one route.</h1>
+        <p class="hero-copy">The embedded tool below keeps all of your existing Odoo conversion and import logic. This page now gives it the full SaaS shell, operator guidance, and faster navigation across the rest of the platform.</p>
+        <div class="hero-actions">
+          <a class="button-link primary" href="#tool">Jump to live tool</a>
+          <a class="button-link secondary" href="/pricing">Review pricing</a>
+        </div>
+      </article>
+
+      <aside class="page-hero-side">
+        <span class="eyebrow inverse">In this route</span>
+        <ul class="detail-list">
+          <li>Connect the Shopify store used for the import.</li>
+          <li>Upload the Odoo CSV and preview the generated order rows.</li>
+          <li>Download `Orders.csv`, mapping output, or start a tracked import job.</li>
+          <li>Use the customer CSV workflow and supporting tools from the same workspace.</li>
+        </ul>
+      </aside>
+    </section>
+
+    <section class="tool-shell-grid">
+      <article class="tool-shell-card dark">
+        <span class="eyebrow">Operator notes</span>
+        <ul class="check-list">
+          <li>Use a valid Shopify Admin API token before starting a live import.</li>
+          <li>Keep local and Render base URLs aligned with the runtime config.</li>
+          <li>Check `/admin` if you need environment status or job visibility.</li>
+        </ul>
+      </article>
+      <article class="tool-shell-card">
+        <span class="eyebrow">Route summary</span>
+        <div class="content-grid cols-3">
+          <div class="metric-card"><span class="metric-value">Orders</span><span class="metric-label">Primary import type</span></div>
+          <div class="metric-card"><span class="metric-value">CSV</span><span class="metric-label">Source format</span></div>
+          <div class="metric-card"><span class="metric-value">Jobs</span><span class="metric-label">Tracked import state</span></div>
+        </div>
+      </article>
+    </section>
+
+    <section class="tool-shell-card" id="tool">
+      <span class="eyebrow">Live migration tool</span>
+      <iframe id="odooToolFrame" class="tool-frame" src="/migration-tool" title="Odoo Migration Tool" scrolling="no"></iframe>
+    </section>
+  </main>
+
+  <script>
+    (function () {
+      function getFrameHeight(frame) {
+        try {
+          var doc = frame.contentDocument || (frame.contentWindow && frame.contentWindow.document);
+          if (!doc) {
+            return 0;
+          }
+
+          var body = doc.body;
+          var html = doc.documentElement;
+          return Math.max(
+            body ? body.scrollHeight : 0,
+            body ? body.offsetHeight : 0,
+            html ? html.clientHeight : 0,
+            html ? html.scrollHeight : 0,
+            html ? html.offsetHeight : 0
+          );
+        } catch (error) {
+          return 0;
+        }
+      }
+
+      document.addEventListener("DOMContentLoaded", function () {
+        var frame = document.getElementById("odooToolFrame");
+        if (!frame) {
+          return;
+        }
+
+        function syncFrameHeight() {
+          var nextHeight = getFrameHeight(frame);
+          if (nextHeight > 0) {
+            frame.style.height = nextHeight + "px";
+          }
+        }
+
+        frame.addEventListener("load", function () {
+          syncFrameHeight();
+
+          try {
+            var doc = frame.contentDocument || (frame.contentWindow && frame.contentWindow.document);
+            var target = doc && (doc.documentElement || doc.body);
+            if (window.ResizeObserver && target) {
+              var observer = new ResizeObserver(syncFrameHeight);
+              observer.observe(target);
+            }
+          } catch (error) {
+            window.setInterval(syncFrameHeight, 800);
+            return;
+          }
+
+          window.setInterval(syncFrameHeight, 800);
+        });
+      });
+    }());
+  </script>
 </body>
 </html>

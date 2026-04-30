@@ -11,7 +11,7 @@ a{text-decoration:none}
 .hero-actions{display:flex;gap:12px;margin-top:24px;flex-wrap:wrap}
 .tabs{background:#273149;color:#fff;padding:0 20px}.tabs ul{max-width:1050px;margin:0 auto;padding:0;display:flex;list-style:none;overflow:auto}
 .tabs li{padding:14px 20px;white-space:nowrap;font-weight:600;font-size:14px;opacity:.88}
-.container{max-width:1050px;margin:0 auto;padding:48px 20px}
+.container{margin:0 auto;padding:48px 20px}
 .section-title{text-align:center;margin:0 0 10px;font-size:34px}.section-sub{text-align:center;color:var(--muted);max-width:750px;margin:0 auto 30px}
 .panel{background:#fff;border-radius:14px;padding:22px;box-shadow:0 8px 22px rgba(28,42,76,.08)}
 .grid{display:grid;gap:16px}.grid-3{grid-template-columns:repeat(auto-fit,minmax(230px,1fr))}.grid-4{grid-template-columns:repeat(auto-fit,minmax(180px,1fr))}

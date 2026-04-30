@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Import Workspace | ShopifyMigrate</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/assets/css/saas-platform.css">
+  <script src="/assets/js/saas-platform.js" defer></script>
+</head>
+<body class="platform-body">
+  <div class="top-banner">Workspace for import prep, reports, and migration handoff.</div>
+  <main class="page-shell">
+    <div class="dashboard-layout">
+      <aside class="dashboard-sidebar">
+        <div class="sidebar-copy">
+          <a class="brand" href="/"><span class="brand-mark">SM</span><span class="brand-copy"><strong>ShopifyMigrate</strong><span>Import workspace</span></span></a>
+        </div>
+        <nav class="sidebar-nav">
+          <a href="/dashboard" data-route="/dashboard"><span class="nav-icon">D</span>Dashboard</a>
+          <a href="/dashboard/odoo" data-route="/dashboard/odoo"><span class="nav-icon">O</span>Odoo Migration</a>
+          <a href="/dashboard/woocommerce" data-route="/dashboard/woocommerce"><span class="nav-icon">W</span>WooCommerce</a>
+          <a href="/dashboard/odoo-panel" data-route="/dashboard/odoo-panel"><span class="nav-icon">I</span>Import Workspace</a>
+          <a href="/dashboard/messages" data-route="/dashboard/messages"><span class="nav-icon">M</span>Messages</a>
+        </nav>
+      </aside>
+
+      <section class="dashboard-main">
+        <article class="panel">
+          <span class="eyebrow">Import workspace</span>
+          <h1 class="section-title">Run the live migration flows from one operator-ready workspace.</h1>
+          <p class="section-subtitle">The real import logic still lives in the dedicated routes. This workspace keeps the process organized so operators know exactly where to go for preparation, direct sync, admin review, and deployment checks.</p>
+          <div class="button-row">
+            <a class="button-link primary" href="/odoo-migration">Open Odoo import workflow</a>
+            <a class="button-link secondary" href="/woocommerce-migration">Open WooCommerce import workflow</a>
+          </div>
+        </article>
+
+        <section class="content-grid cols-3">
+          <article class="panel">
+            <span class="badge primary">Prepare</span>
+            <h2 class="card-title">Upload and preview</h2>
+            <p class="card-copy">Validate source CSV files, preview transformed rows, and confirm mapping before you start any live import.</p>
+          </article>
+          <article class="panel">
+            <span class="badge success">Import</span>
+            <h2 class="card-title">Run the live sync</h2>
+            <p class="card-copy">Use the product or order route that matches your source system, then connect the correct Shopify store and token.</p>
+          </article>
+          <article class="panel">
+            <span class="badge warning">Review</span>
+            <h2 class="card-title">Check admin visibility</h2>
+            <p class="card-copy">Open the admin workspace to review environment status, recent jobs, and store entitlement or payment activity.</p>
+          </article>
+        </section>
+
+        <section class="table-card">
+          <div class="table-header">
+            <div>
+              <span class="eyebrow">Operator checklist</span>
+              <h2 class="card-title">Suggested run order</h2>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Step</th>
+                  <th>Action</th>
+                  <th>Where to do it</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>1</td>
+                  <td>Check environment and base URLs</td>
+                  <td><a href="/admin">Admin panel</a></td>
+                </tr>
+                <tr>
+                  <td>2</td>
+                  <td>Upload source CSV and preview mapping</td>
+                  <td><a href="/odoo-migration">Odoo route</a> or <a href="/woocommerce-migration">WooCommerce route</a></td>
+                </tr>
+                <tr>
+                  <td>3</td>
+                  <td>Run import or direct sync into Shopify</td>
+                  <td>Dedicated migration route for the source system</td>
+                </tr>
+                <tr>
+                  <td>4</td>
+                  <td>Review jobs, payments, and readiness</td>
+                  <td><a href="/admin">Admin panel</a></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </section>
+    </div>
+  </main>
+</body>
+</html>

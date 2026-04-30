@@ -592,11 +592,6 @@
         </section>
 
         <section class="section">
-            <div class="tabs-nav" id="toolTabs">
-                <button class="tab-btn active" data-tab="ordersTab">Order Sync</button>
-                <button class="tab-btn" data-tab="wooProductTab">WooCommerce Product Migration</button>
-            </div>
-            <div id="ordersTab">
             <div class="card">
                 <h2>Customer CSV Mapping</h2>
                 <p>Upload the Shopify customer template CSV and the Odoo <code>res.partner.csv</code>. This section only prepares a manual Shopify customer import CSV and does not call the Shopify API.</p>
@@ -632,7 +627,6 @@
                 </div>
                 <div class="status" id="customerStatus"></div>
             </div>
-            </div>
         </section>
 
         <section class="section hidden" id="wooProductTab">
@@ -648,15 +642,11 @@
                         <label for="wooAccessToken">Shopify Admin API token</label>
                         <input id="wooAccessToken" type="password" placeholder="shpat_...">
                     </div>
-                    <div class="field">
-                        <label for="wooApiBase">Sync API base URL (optional)</label>
-                        <input id="wooApiBase" type="text" placeholder="https://shopify-migration-with-oddo.onrender.com">
-                    </div>
                     <div class="field field-full">
                         <label class="dropzone" id="wooDropzone">
                             <input class="file-input" id="wooFileInput" type="file" accept=".csv,text/csv">
                             <h3>Select WooCommerce Product CSV</h3>
-                            <p>Upload WooCommerce product export CSV. The app maps fields to Shopify product CSV fields and supports direct sync.</p>
+                            <p>Upload WooCommerce product export CSV. The app maps fields to Shopify product CSV fields and can import products and image URLs directly into Shopify.</p>
                         </label>
                         <div class="meta-box" id="wooMeta"><strong>No WooCommerce file selected yet</strong><span>Choose WooCommerce products CSV.</span></div>
                     </div>
@@ -664,7 +654,7 @@
                 <div class="actions">
                     <button class="primary" id="prepareWooButton" disabled>Prepare Shopify Product CSV</button>
                     <button class="secondary" id="downloadWooButton" disabled>Download Shopify Product CSV</button>
-                    <button class="warn" id="syncWooButton" disabled>Create / Update Products in Shopify</button>
+                    <button class="warn" id="syncWooButton" disabled>Import Products to Shopify</button>
                 </div>
                 <div class="status" id="wooStatus"></div>
             </div>
@@ -750,9 +740,6 @@
             var customerPreviewSection = document.getElementById("customerPreviewSection");
             var customerStats = document.getElementById("customerStats");
             var customerPreviewBody = document.getElementById("customerPreviewBody");
-            var toolTabs = document.getElementById("toolTabs");
-            var ordersTab = document.getElementById("ordersTab");
-            var wooProductTab = document.getElementById("wooProductTab");
             var wooFileInput = document.getElementById("wooFileInput");
             var wooDropzone = document.getElementById("wooDropzone");
             var wooMeta = document.getElementById("wooMeta");
@@ -761,8 +748,6 @@
             var syncWooButton = document.getElementById("syncWooButton");
             var wooStatus = document.getElementById("wooStatus");
             var wooFieldBody = document.getElementById("wooFieldBody");
-            var wooApiBaseInput = document.getElementById("wooApiBase");
-
             var selectedFile = null;
             var previewResult = null;
             var connectedShop = null;
@@ -863,14 +848,11 @@
             function buildSyncServerHelpMessage() {
                 var renderBase = getConfiguredApiBase() || "https://shopify-migration-with-oddo.onrender.com";
                 var localBase = getLocalApiBase() || "http://127.0.0.1:3456";
-                return "Cannot reach the sync server. If hosted on Render, set \"Sync API base URL\" to " + renderBase + ". Do not include /odoo-migration in this field. For local mode use " + localBase + ".";
+                return "Cannot reach the app server. For local mode start the project at " + localBase + ". For hosted mode use " + renderBase + ".";
             }
 
             function getApiBase() {
-                var base = normalizeApiBase(wooApiBaseInput && wooApiBaseInput.value ? wooApiBaseInput.value : "");
-                if (!base) {
-                    base = normalizeApiBase(window.localStorage.getItem("wooApiBase") || "");
-                }
+                var base = "";
                 if (!base) {
                     base = getConfiguredApiBase();
                 }
@@ -994,12 +976,20 @@
             function refreshWooStates() {
                 prepareWooButton.disabled = !wooFile;
                 downloadWooButton.disabled = !wooCsvResult;
-                syncWooButton.disabled = !(wooRows.length && document.getElementById("wooShopDomain").value && document.getElementById("wooAccessToken").value);
+                syncWooButton.disabled = !(wooFile && document.getElementById("wooShopDomain").value && document.getElementById("wooAccessToken").value);
             }
             async function syncWooProducts() {
                 setStatus(wooStatus, "Syncing WooCommerce products to Shopify...", "info");
                 try {
-                    var response = await postJson("/api/products/sync", { shopDomain: document.getElementById("wooShopDomain").value, accessToken: document.getElementById("wooAccessToken").value, products: wooRows });
+                    if (!wooFile) {
+                        throw new Error("Select a WooCommerce CSV before syncing.");
+                    }
+                    var csvText = await wooFile.text();
+                    var response = await postJson("/api/woocommerce/shopify-sync-products", {
+                        shopDomain: document.getElementById("wooShopDomain").value,
+                        accessToken: document.getElementById("wooAccessToken").value,
+                        csvText: csvText
+                    });
                     setStatus(wooStatus, "Sync completed. Created: " + response.summary.created + ", Updated: " + response.summary.updated + ", Failed: " + response.summary.failed, "ok");
                 } catch (error) { setStatus(wooStatus, error.message, "error"); }
             }
@@ -1452,14 +1442,6 @@
             });
             downloadWooButton.addEventListener("click", function () { if (wooCsvResult) { downloadText("woocommerce.shopify.products.csv", wooCsvResult); } });
             syncWooButton.addEventListener("click", function () { syncWooProducts(); });
-            toolTabs.addEventListener("click", function (event) {
-                if (!event.target.matches(".tab-btn")) { return; }
-                var tab = event.target.getAttribute("data-tab");
-                Array.prototype.forEach.call(toolTabs.querySelectorAll(".tab-btn"), function (b) { b.classList.remove("active"); });
-                event.target.classList.add("active");
-                setHidden(ordersTab, tab !== "ordersTab");
-                setHidden(wooProductTab, tab !== "wooProductTab");
-            });
 
             previewButton.addEventListener("click", function () {
                 previewCsv();
@@ -1507,14 +1489,6 @@
                 }
                 window.location.href = toApiUrl("/api/jobs/" + encodeURIComponent(currentJobId) + "/results.csv");
             });
-
-            if (wooApiBaseInput) {
-                wooApiBaseInput.placeholder = getConfiguredApiBase() || "https://shopify-migration-with-oddo.onrender.com";
-                wooApiBaseInput.value = window.localStorage.getItem("wooApiBase") || getConfiguredApiBase() || "";
-                wooApiBaseInput.addEventListener("input", function () {
-                    window.localStorage.setItem("wooApiBase", wooApiBaseInput.value.trim());
-                });
-            }
 
             if (timeZoneOffsetInput) {
                 timeZoneOffsetInput.value = getDefaultTimeZoneOffset();

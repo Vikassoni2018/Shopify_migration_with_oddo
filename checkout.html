@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Checkout | ShopifyMigrate</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/assets/css/saas-platform.css">
+  <script src="/assets/js/saas-platform.js" defer></script>
+</head>
+<body class="platform-body">
+  <div class="top-banner">Quote-powered checkout screen for migration plans.</div>
+  <header class="site-header">
+    <div class="site-header-inner">
+      <a class="brand" href="/"><span class="brand-mark">SM</span><span class="brand-copy"><strong>ShopifyMigrate</strong><span>Checkout and plan summary</span></span></a>
+      <nav class="site-nav">
+        <div class="site-nav-links">
+          <a href="/" data-route="/">Home</a>
+          <a href="/pricing" data-route="/pricing">Pricing</a>
+          <a href="/help" data-route="/help">Help</a>
+        </div>
+        <div class="site-nav-cta">
+          <a class="button-link secondary" href="/pricing">Back to pricing</a>
+          <a class="button-link primary" href="/dashboard">Dashboard</a>
+        </div>
+        <button class="nav-toggle" type="button" aria-label="Open menu" aria-expanded="false" data-nav-toggle>☰</button>
+      </nav>
+    </div>
+    <div class="mobile-nav" data-mobile-nav>
+      <div class="mobile-nav-inner">
+        <a href="/">Home</a>
+        <a href="/pricing">Pricing</a>
+        <a href="/help">Help</a>
+        <div class="nav-actions">
+          <a class="button-link secondary" href="/pricing">Back to pricing</a>
+          <a class="button-link primary" href="/dashboard">Dashboard</a>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main class="page-shell">
+    <section class="split-panel">
+      <div class="split-panel-copy">
+        <span class="eyebrow inverse">Checkout</span>
+        <h1 class="section-title">Review the migration plan before you charge the store.</h1>
+        <p class="muted">This screen uses your live order quote endpoint for totals. It is ready for the next step of connecting a dedicated Stripe checkout-session endpoint when you want to capture real payments.</p>
+        <ul class="check-list">
+          <li>Live order quote calculation</li>
+          <li>Free tier awareness</li>
+          <li>Professional and full-unlock plan support</li>
+        </ul>
+      </div>
+
+      <div class="split-panel-body">
+        <div class="field-grid cols-2">
+          <div class="field">
+            <label for="checkoutPlan">Plan</label>
+            <select id="checkoutPlan">
+              <option value="per_1000">Professional</option>
+              <option value="full">Full migration</option>
+              <option value="free">Free trial</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="checkoutOrders">Orders to migrate</label>
+            <input id="checkoutOrders" type="number" min="0" step="1" value="1800">
+          </div>
+        </div>
+
+        <div class="page-section content-grid cols-2">
+          <article class="panel">
+            <h2 class="card-title">Billing details</h2>
+            <div class="form-stack">
+              <div class="field">
+                <label for="billingName">Name</label>
+                <input id="billingName" type="text" placeholder="John Doe">
+              </div>
+              <div class="field">
+                <label for="billingEmail">Email</label>
+                <input id="billingEmail" type="email" placeholder="john@example.com">
+              </div>
+              <div class="field">
+                <label for="billingStore">Shopify store domain</label>
+                <input id="billingStore" type="text" placeholder="your-store.myshopify.com">
+              </div>
+            </div>
+          </article>
+
+          <article class="panel">
+            <h2 class="card-title">Order summary</h2>
+            <div class="panel-stack" id="checkoutSummary">
+              <div class="metric-card"><span class="metric-value">10</span><span class="metric-label">Free orders</span></div>
+              <div class="metric-card"><span class="metric-value">1,790</span><span class="metric-label">Paid orders</span></div>
+              <div class="metric-card"><span class="metric-value">$20.00</span><span class="metric-label">Estimated total</span></div>
+            </div>
+            <div class="status-message info" id="checkoutStatus">Calculating live quote...</div>
+          </article>
+        </div>
+
+        <div class="button-row">
+          <button class="button primary" type="button" id="checkoutContinueButton">Continue to confirmation</button>
+          <a class="button-link secondary" href="/pricing">Adjust plan</a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    document.addEventListener("DOMContentLoaded", function () {
+      var query = PlatformApp.readQuery();
+      var planInput = document.getElementById("checkoutPlan");
+      var ordersInput = document.getElementById("checkoutOrders");
+      var summary = document.getElementById("checkoutSummary");
+      var status = document.getElementById("checkoutStatus");
+      var continueButton = document.getElementById("checkoutContinueButton");
+
+      if (query.get("plan")) {
+        planInput.value = query.get("plan");
+      }
+      if (query.get("orders")) {
+        ordersInput.value = query.get("orders");
+      }
+
+      async function refreshQuote() {
+        var plan = planInput.value || "per_1000";
+        var totalOrders = Math.max(0, Number(ordersInput.value || 0));
+
+        status.className = "status-message info";
+        status.textContent = "Calculating live quote...";
+
+        try {
+          var payload = await PlatformApp.requestJson("/api/payments/quote", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ totalOrders: totalOrders })
+          });
+
+          var estimated = plan === "full"
+            ? payload.pricing.fullMigrationUsd
+            : plan === "free"
+              ? 0
+              : payload.quote.perThousandTotalUsd;
+
+          summary.innerHTML = [
+            '<div class="metric-card"><span class="metric-value">' + PlatformApp.formatInteger(payload.quote.freeOrders) + '</span><span class="metric-label">Free orders</span></div>',
+            '<div class="metric-card"><span class="metric-value">' + PlatformApp.formatInteger(payload.quote.additionalPaidOrders) + '</span><span class="metric-label">Paid orders</span></div>',
+            '<div class="metric-card"><span class="metric-value">' + PlatformApp.formatCurrency(estimated) + '</span><span class="metric-label">Estimated total</span></div>'
+          ].join("");
+
+          status.className = "status-message success";
+          status.textContent = "Quote calculated. This page is ready to connect to a dedicated live payment capture step.";
+        } catch (error) {
+          status.className = "status-message error";
+          status.textContent = error.message;
+        }
+      }
+
+      continueButton.addEventListener("click", function () {
+        var plan = encodeURIComponent(planInput.value || "per_1000");
+        var orders = encodeURIComponent(String(Math.max(0, Number(ordersInput.value || 0))));
+        window.location.href = "/payment-success?plan=" + plan + "&orders=" + orders;
+      });
+
+      planInput.addEventListener("change", refreshQuote);
+      ordersInput.addEventListener("change", refreshQuote);
+      refreshQuote();
+    });
+  </script>
+</body>
+</html>

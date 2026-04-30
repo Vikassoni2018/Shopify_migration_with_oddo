@@ -1,0 +1,237 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Pricing | ShopifyMigrate</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/assets/css/saas-platform.css">
+  <script src="/assets/js/saas-platform.js" defer></script>
+</head>
+<body class="platform-body">
+  <div class="top-banner">Transparent pricing for order-based migrations.</div>
+  <header class="site-header">
+    <div class="site-header-inner">
+      <a class="brand" href="/"><span class="brand-mark">SM</span><span class="brand-copy"><strong>ShopifyMigrate</strong><span>Plans, quotes, and migration unlocks</span></span></a>
+      <nav class="site-nav">
+        <div class="site-nav-links">
+          <a href="/" data-route="/">Home</a>
+          <a href="/pricing" data-route="/pricing">Pricing</a>
+          <a href="/help" data-route="/help">Help</a>
+          <a href="/dashboard" data-route="/dashboard" data-route-prefix>Dashboard</a>
+          <a href="/admin" data-route="/admin" data-route-prefix>Admin</a>
+        </div>
+        <div class="site-nav-cta">
+          <a class="button-link secondary" href="/login">Log in</a>
+          <a class="button-link primary" href="/signup">Get Started</a>
+        </div>
+        <button class="nav-toggle" type="button" aria-label="Open menu" aria-expanded="false" data-nav-toggle>☰</button>
+      </nav>
+    </div>
+    <div class="mobile-nav" data-mobile-nav>
+      <div class="mobile-nav-inner">
+        <a href="/">Home</a>
+        <a href="/pricing">Pricing</a>
+        <a href="/help">Help</a>
+        <a href="/dashboard">Dashboard</a>
+        <a href="/admin">Admin</a>
+        <div class="nav-actions">
+          <a class="button-link secondary" href="/login">Log in</a>
+          <a class="button-link primary" href="/signup">Get Started</a>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main class="page-shell">
+    <section class="page-hero">
+      <article class="page-hero-main">
+        <span class="eyebrow">Pricing</span>
+        <h1 class="hero-title">Simple pricing for trial runs and full production migrations.</h1>
+        <p class="hero-copy">The app already enforces the first 10 free orders, calculates pay-per-1000 requirements, and tracks full unlocks. Use the calculator below to preview what your import needs before you start.</p>
+      </article>
+      <aside class="page-hero-side">
+        <span class="eyebrow inverse">How billing works</span>
+        <ul class="detail-list">
+          <li>Free migration applies to the first 10 orders.</li>
+          <li>Additional orders are priced in 1,000-order blocks.</li>
+          <li>Full migration unlock removes quota limits for the store.</li>
+        </ul>
+      </aside>
+    </section>
+
+    <section class="page-section">
+      <div class="plan-grid">
+        <article class="pricing-card">
+          <span class="badge primary">Starter</span>
+          <div>
+            <h2 class="card-title">Free trial</h2>
+            <p class="card-copy">Validate files, preview mapping, and migrate your first 10 orders without a card.</p>
+          </div>
+          <div class="price">$0</div>
+          <ul class="check-list">
+            <li>First 10 orders free</li>
+            <li>CSV preparation and preview</li>
+            <li>Basic migration validation</li>
+          </ul>
+          <a class="button-link secondary" href="/signup">Start free</a>
+        </article>
+
+        <article class="pricing-card featured">
+          <span class="badge success">Most popular</span>
+          <div>
+            <h2 class="card-title">Professional</h2>
+            <p class="card-copy">Unlock direct imports for growing stores and pay only for the additional order volume you need.</p>
+          </div>
+          <div class="price">$10 <span>/ 1,000 orders</span></div>
+          <ul class="check-list">
+            <li>Direct Shopify import</li>
+            <li>Image-ready product workflows</li>
+            <li>Quota-based order migration unlock</li>
+          </ul>
+          <a class="button-link primary" href="/checkout?plan=per_1000&orders=1000">Choose professional</a>
+        </article>
+
+        <article class="pricing-card">
+          <span class="badge warning">Unlimited</span>
+          <div>
+            <h2 class="card-title">Full migration</h2>
+            <p class="card-copy">Best when you already know the store will move in one run and you want a single one-time unlock.</p>
+          </div>
+          <div class="price">$100 <span>one time</span></div>
+          <ul class="check-list">
+            <li>Unlimited order imports</li>
+            <li>Priority support and admin visibility</li>
+            <li>No quota block management</li>
+          </ul>
+          <a class="button-link secondary" href="/checkout?plan=full&orders=10000">Choose full migration</a>
+        </article>
+      </div>
+    </section>
+
+    <section class="page-section split-panel">
+      <div class="split-panel-copy">
+        <span class="eyebrow inverse">Live quote</span>
+        <h2 class="section-title">Calculate what your order volume will require.</h2>
+        <p class="muted">This uses the same server quote endpoint that the import flow can rely on. Enter an order count to see how much of it is free and what paid capacity is needed.</p>
+      </div>
+      <div class="split-panel-body">
+        <div class="field-grid cols-2">
+          <div class="field">
+            <label for="quoteOrders">Total orders to migrate</label>
+            <input id="quoteOrders" type="number" min="0" step="1" value="1800">
+          </div>
+          <div class="field">
+            <label for="quotePlan">Recommended plan</label>
+            <select id="quotePlan">
+              <option value="free">Free trial</option>
+              <option value="per_1000" selected>Professional</option>
+              <option value="full">Full migration</option>
+            </select>
+          </div>
+        </div>
+        <div class="button-row">
+          <button class="button primary" id="calculateQuoteButton" type="button">Calculate quote</button>
+          <a class="button-link secondary" id="quoteCheckoutLink" href="/checkout?plan=per_1000&orders=1800">Continue to checkout</a>
+        </div>
+        <div class="status-message info" id="quoteStatus">Ready to calculate from the live payment quote endpoint.</div>
+        <div class="content-grid cols-4" id="quoteResults">
+          <div class="metric-card"><span class="metric-value">10</span><span class="metric-label">Free orders</span></div>
+          <div class="metric-card"><span class="metric-value">1,790</span><span class="metric-label">Paid orders</span></div>
+          <div class="metric-card"><span class="metric-value">2</span><span class="metric-label">1,000-order blocks</span></div>
+          <div class="metric-card"><span class="metric-value">$20.00</span><span class="metric-label">Estimated charge</span></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="page-section panel">
+      <div class="section-heading">
+        <span class="eyebrow">FAQ</span>
+        <h2 class="section-title">Common pricing questions</h2>
+      </div>
+      <div class="faq-list">
+        <div class="faq-item">
+          <button class="faq-toggle" data-faq-toggle type="button">Does the free plan need a credit card?<span>+</span></button>
+          <div class="faq-answer">No. The first 10 orders can be migrated without entering a card, which makes it useful for workflow validation and small proof-of-concept runs.</div>
+        </div>
+        <div class="faq-item">
+          <button class="faq-toggle" data-faq-toggle type="button">What happens after 10 orders?<span>+</span></button>
+          <div class="faq-answer">The server calculates the extra paid order count and checks whether the selected plan has enough quota or a full migration unlock.</div>
+        </div>
+        <div class="faq-item">
+          <button class="faq-toggle" data-faq-toggle type="button">Can one store keep multiple quota grants?<span>+</span></button>
+          <div class="faq-answer">Yes. The entitlement map can accumulate transactions, so multiple 1,000-order purchases can build additional quota for the same store domain.</div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="site-footer-inner">
+      <div class="footer-bottom">
+        <span>&copy; <span data-current-year></span> ShopifyMigrate.</span>
+        <span>Order-based pricing for Shopify migrations.</span>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    document.addEventListener("DOMContentLoaded", function () {
+      var ordersInput = document.getElementById("quoteOrders");
+      var planInput = document.getElementById("quotePlan");
+      var calculateButton = document.getElementById("calculateQuoteButton");
+      var results = document.getElementById("quoteResults");
+      var checkoutLink = document.getElementById("quoteCheckoutLink");
+      var status = document.getElementById("quoteStatus");
+
+      function renderMetrics(freeOrders, additionalPaidOrders, blocks, totalUsd) {
+        results.innerHTML = [
+          '<div class="metric-card"><span class="metric-value">' + PlatformApp.formatInteger(freeOrders) + '</span><span class="metric-label">Free orders</span></div>',
+          '<div class="metric-card"><span class="metric-value">' + PlatformApp.formatInteger(additionalPaidOrders) + '</span><span class="metric-label">Paid orders</span></div>',
+          '<div class="metric-card"><span class="metric-value">' + PlatformApp.formatInteger(blocks) + '</span><span class="metric-label">1,000-order blocks</span></div>',
+          '<div class="metric-card"><span class="metric-value">' + PlatformApp.formatCurrency(totalUsd) + '</span><span class="metric-label">Estimated charge</span></div>'
+        ].join("");
+      }
+
+      async function calculate() {
+        var totalOrders = Math.max(0, Number(ordersInput.value || 0));
+        var selectedPlan = planInput.value || "free";
+
+        status.className = "status-message info";
+        status.textContent = "Calculating quote...";
+        checkoutLink.href = "/checkout?plan=" + encodeURIComponent(selectedPlan) + "&orders=" + encodeURIComponent(String(totalOrders));
+
+        try {
+          var payload = await PlatformApp.requestJson("/api/payments/quote", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ totalOrders: totalOrders })
+          });
+
+          renderMetrics(
+            payload.quote.freeOrders,
+            payload.quote.additionalPaidOrders,
+            payload.quote.perThousandBlocks,
+            selectedPlan === "full"
+              ? payload.pricing.fullMigrationUsd
+              : payload.quote.perThousandTotalUsd
+          );
+
+          status.className = "status-message success";
+          status.textContent = selectedPlan === "full"
+            ? "Full migration selected. One-time unlock shown below."
+            : "Quote calculated from the live pricing endpoint.";
+        } catch (error) {
+          status.className = "status-message error";
+          status.textContent = error.message;
+        }
+      }
+
+      calculateButton.addEventListener("click", calculate);
+      planInput.addEventListener("change", calculate);
+      ordersInput.addEventListener("change", calculate);
+      calculate();
+    });
+  </script>
+</body>
+</html>

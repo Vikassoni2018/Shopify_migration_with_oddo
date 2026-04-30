@@ -196,7 +196,12 @@ function buildRuntimeConfig(request) {
         localApiBaseUrl: CONFIG.localApiBaseUrl,
         defaultTimeZoneOffset: CONFIG.defaultTimeZoneOffset,
         renderExternalUrl: CONFIG.renderExternalUrl,
-        shopifyApiVersion: API_VERSION
+        shopifyApiVersion: API_VERSION,
+        features: {
+            adminConfigured: isAdminConfigured(),
+            stripeCheckoutConfigured: Boolean(CONFIG.stripePublishableKey && CONFIG.stripeSecretKey),
+            stripeWebhookConfigured: Boolean(CONFIG.stripeWebhookSecret)
+        }
     };
 }
 
@@ -298,6 +303,60 @@ function buildAdminConfigStatus() {
         stripePublishableKeyPreview: maskConfiguredValue(CONFIG.stripePublishableKey),
         stripeSecretKeyConfigured: Boolean(CONFIG.stripeSecretKey),
         stripeWebhookSecretConfigured: Boolean(CONFIG.stripeWebhookSecret)
+    };
+}
+
+function buildAdminOverviewPayload() {
+    const allJobs = Array.from(jobs.values()).sort((left, right) => {
+        const leftTime = Date.parse(left.updatedAt || left.createdAt || 0);
+        const rightTime = Date.parse(right.updatedAt || right.createdAt || 0);
+        return rightTime - leftTime;
+    });
+
+    const stores = Array.from(entitlements.values()).sort((left, right) => {
+        const leftLast = left.transactions && left.transactions.length
+            ? Date.parse(left.transactions[left.transactions.length - 1].grantedAt || 0)
+            : 0;
+        const rightLast = right.transactions && right.transactions.length
+            ? Date.parse(right.transactions[right.transactions.length - 1].grantedAt || 0)
+            : 0;
+        return rightLast - leftLast;
+    }).map((entitlement) => ({
+        shopDomain: entitlement.shopDomain,
+        paidOrderQuota: entitlement.paidOrderQuota || 0,
+        fullMigrationUnlocked: Boolean(entitlement.fullMigrationUnlocked),
+        transactionCount: Array.isArray(entitlement.transactions) ? entitlement.transactions.length : 0,
+        lastTransactionAt: Array.isArray(entitlement.transactions) && entitlement.transactions.length
+            ? entitlement.transactions[entitlement.transactions.length - 1].grantedAt
+            : ""
+    }));
+
+    const payments = Array.from(entitlements.values()).flatMap((entitlement) => (
+        Array.isArray(entitlement.transactions) ? entitlement.transactions.map((transaction) => ({
+            shopDomain: entitlement.shopDomain,
+            transactionId: transaction.transactionId || "",
+            eventType: transaction.eventType || "",
+            plan: transaction.plan || "",
+            grantedAt: transaction.grantedAt || ""
+        })) : []
+    )).sort((left, right) => Date.parse(right.grantedAt || 0) - Date.parse(left.grantedAt || 0));
+
+    return {
+        apiVersion: API_VERSION,
+        configStatus: buildAdminConfigStatus(),
+        metrics: {
+            totalJobs: allJobs.length,
+            completedJobs: allJobs.filter((job) => job.status === "completed").length,
+            processingJobs: allJobs.filter((job) => job.status === "processing" || job.status === "queued").length,
+            failedJobs: allJobs.filter((job) => job.status === "failed").length,
+            activeStoreEntitlements: stores.length,
+            totalTransactions: payments.length,
+            fullUnlocks: stores.filter((store) => store.fullMigrationUnlocked).length,
+            totalPaidQuota: stores.reduce((sum, store) => sum + (store.paidOrderQuota || 0), 0)
+        },
+        recentJobs: allJobs.slice(0, 12).map((job) => getJobPayload(job)),
+        stores,
+        payments: payments.slice(0, 24)
     };
 }
 
@@ -549,6 +608,13 @@ async function readRawBody(request) {
     return Buffer.concat(chunks);
 }
 
+function parseCsvUploadHeaders(request) {
+    return {
+        shopDomain: normalizeShopDomain(request.headers["x-shop-domain"]),
+        accessToken: String(request.headers["x-shopify-access-token"] || "").trim()
+    };
+}
+
 function getShopEntitlement(shopDomain) {
     const key = normalizeShopDomain(shopDomain);
     return entitlements.get(key) || {
@@ -760,6 +826,64 @@ function parseSimpleCsv(csvText) {
         });
         return output;
     });
+}
+
+function parseWooImageUrls(value) {
+    const input = String(value || "").trim();
+    if (!input) {
+        return [];
+    }
+
+    const urls = input
+        .split(/\s*,\s*/)
+        .map((item) => String(item || "").trim())
+        .filter(Boolean)
+        .filter((item) => /^https?:\/\//i.test(item));
+
+    return Array.from(new Set(urls));
+}
+
+async function ensureProductImages(shopDomain, accessToken, productId, imageUrls, altText) {
+    if (!productId || !Array.isArray(imageUrls) || !imageUrls.length) {
+        return {
+            added: 0,
+            skipped: 0
+        };
+    }
+
+    const existingProduct = await shopifyRest(shopDomain, accessToken, "GET", `/products/${productId}.json?fields=id,images`);
+    const existingImages = existingProduct && existingProduct.product && Array.isArray(existingProduct.product.images)
+        ? existingProduct.product.images
+        : [];
+    const existingSources = new Set(
+        existingImages
+            .map((image) => String(image && image.src ? image.src : "").trim())
+            .filter(Boolean)
+    );
+
+    let added = 0;
+    let skipped = 0;
+
+    for (const imageUrl of imageUrls) {
+        if (existingSources.has(imageUrl)) {
+            skipped += 1;
+            continue;
+        }
+
+        await shopifyRest(shopDomain, accessToken, "POST", `/products/${productId}/images.json`, {
+            image: {
+                src: imageUrl,
+                alt: altText || null
+            }
+        });
+        existingSources.add(imageUrl);
+        added += 1;
+    }
+
+    return {
+        added,
+        skipped
+    };
 }
 
 function mapPaymentStatus(value) {
@@ -1270,6 +1394,27 @@ async function handleApiRequest(request, response) {
         return;
     }
 
+    if (request.method === "GET" && url.pathname === "/api/admin/overview") {
+        const session = getAdminSession(request);
+        if (!session) {
+            sendJson(response, 401, {
+                ok: false,
+                error: "Admin authentication required."
+            });
+            return;
+        }
+
+        sendJson(response, 200, {
+            ok: true,
+            authenticated: true,
+            admin: {
+                email: session.email
+            },
+            overview: buildAdminOverviewPayload()
+        });
+        return;
+    }
+
     if (request.method === "POST" && url.pathname === "/api/connect") {
         try {
             const payload = await readJsonBody(request);
@@ -1477,21 +1622,42 @@ async function handleApiRequest(request, response) {
 
     if (request.method === "POST" && url.pathname === "/api/woocommerce/shopify-sync-products") {
         try {
-            const body = await readJsonBody(request);
-            const shopDomain = normalizeShopDomain(body.shopDomain);
-            const accessToken = String(body.accessToken || "").trim();
-            const products = parseSimpleCsv(body.csvText || "");
+            const contentType = String(request.headers["content-type"] || "").toLowerCase();
+            let shopDomain = "";
+            let accessToken = "";
+            let csvText = "";
+
+            if (contentType.includes("application/json")) {
+                const body = await readJsonBody(request);
+                shopDomain = normalizeShopDomain(body.shopDomain);
+                accessToken = String(body.accessToken || "").trim();
+                csvText = String(body.csvText || "");
+            } else {
+                const uploadHeaders = parseCsvUploadHeaders(request);
+                const rawBody = await readRawBody(request);
+                shopDomain = uploadHeaders.shopDomain;
+                accessToken = uploadHeaders.accessToken;
+                csvText = rawBody.toString("utf8");
+            }
+
+            const products = parseSimpleCsv(csvText);
             if (!shopDomain || !accessToken || !products.length) {
                 throw new Error("shopDomain, accessToken, and csvText are required.");
             }
 
             const results = [];
+            const summary = {
+                created: 0,
+                updated: 0,
+                failed: 0
+            };
             for (const row of products) {
                 const title = row.Name || row.Title || "Untitled";
                 const handle = String(title || row.SKU || "product")
                     .toLowerCase()
                     .replace(/[^a-z0-9]+/g, "-")
                     .replace(/^-|-$/g, "");
+                const imageUrls = parseWooImageUrls(row.Images);
                 try {
                     const search = await shopifyGraphql(shopDomain, accessToken, `query($query: String!){products(first:1, query:$query){nodes{id}}}`, { query: `handle:${handle}` });
                     const existing = search && search.products && search.products.nodes && search.products.nodes[0];
@@ -1500,32 +1666,77 @@ async function handleApiRequest(request, response) {
                             title,
                             body_html: row.Description || row["Short description"] || "",
                             handle,
+                            vendor: row.Brands || row.Vendor || "",
+                            product_type: row.Categories ? String(row.Categories).split(",")[0].trim() : "",
                             tags: [row.Categories, row.Tags].filter(Boolean).join(", "),
                             status: (String(row.Published || "1") === "1" || String(row.Published || "").toLowerCase() === "true") ? "active" : "draft",
                             variants: [{
                                 sku: row.SKU || "",
                                 price: row["Sale price"] || row["Regular price"] || row.Price || "0",
                                 compare_at_price: row["Regular price"] || null,
-                                inventory_quantity: Number(row.Stock || 0)
+                                inventory_quantity: Number(row.Stock || 0),
+                                inventory_management: "shopify",
+                                inventory_policy: (String(row["Backorders allowed?"] || "").trim() === "1" || String(row["Backorders allowed?"] || "").toLowerCase() === "yes") ? "continue" : "deny",
+                                fulfillment_service: "manual",
+                                taxable: !["none", "false", "0"].includes(String(row["Tax status"] || "").trim().toLowerCase()),
+                                barcode: row["GTIN, UPC, EAN, or ISBN"] || ""
                             }]
                         }
                     };
 
+                    if (row["Weight (kg)"]) {
+                        productPayload.product.variants[0].weight = Number.parseFloat(String(row["Weight (kg)"] || "0")) || 0;
+                        productPayload.product.variants[0].weight_unit = "kg";
+                    }
+
+                    if (row["Attribute 1 name"] && row["Attribute 1 value(s)"]) {
+                        productPayload.product.options = [row["Attribute 1 name"]];
+                        productPayload.product.variants[0].option1 = row["Attribute 1 value(s)"];
+                    }
+
+                    if (imageUrls.length) {
+                        productPayload.product.images = imageUrls.map((imageUrl) => ({
+                            src: imageUrl,
+                            alt: title
+                        }));
+                    }
+
                     if (existing && existing.id) {
                         const numericId = String(existing.id).split("/").pop();
-                        await shopifyRest(shopDomain, accessToken, "PUT", `/products/${numericId}.json`, { product: { id: Number(numericId), ...productPayload.product } });
-                        results.push({ title, action: "update", shopifyId: numericId, status: "ok" });
+                        const updateProduct = Object.assign({}, productPayload.product);
+                        delete updateProduct.images;
+                        await shopifyRest(shopDomain, accessToken, "PUT", `/products/${numericId}.json`, { product: { id: Number(numericId), ...updateProduct } });
+                        const imageSummary = await ensureProductImages(shopDomain, accessToken, numericId, imageUrls, title);
+                        summary.updated += 1;
+                        results.push({
+                            title,
+                            action: "update",
+                            shopifyId: numericId,
+                            status: "ok",
+                            imagesAdded: imageSummary.added,
+                            imagesSkipped: imageSummary.skipped
+                        });
                     } else {
                         const created = await shopifyRest(shopDomain, accessToken, "POST", "/products.json", productPayload);
                         const shopifyId = created && created.product && created.product.id;
-                        results.push({ title, action: "create", shopifyId: shopifyId || "", status: "ok" });
+                        const imageSummary = await ensureProductImages(shopDomain, accessToken, shopifyId, imageUrls, title);
+                        summary.created += 1;
+                        results.push({
+                            title,
+                            action: "create",
+                            shopifyId: shopifyId || "",
+                            status: "ok",
+                            imagesAdded: imageSummary.added,
+                            imagesSkipped: imageSummary.skipped
+                        });
                     }
                 } catch (error) {
+                    summary.failed += 1;
                     results.push({ title, action: "error", shopifyId: "", status: error.message });
                 }
             }
 
-            sendJson(response, 200, { ok: true, total: results.length, results });
+            sendJson(response, 200, { ok: true, total: results.length, summary, results });
         } catch (error) {
             sendJson(response, 400, { ok: false, error: error.message });
         }
@@ -1552,15 +1763,31 @@ function handleStaticRequest(request, response) {
     const staticRoutes = {
         "/": "frontend_pages.html",
         "/index.html": "frontend_pages.html",
+        "/pricing": "pricing.html",
+        "/help": "help.html",
+        "/login": "login.html",
+        "/signup": "signup.html",
+        "/checkout": "checkout.html",
+        "/payment-success": "payment-success.html",
+        "/payment-failed": "payment-failed.html",
+        "/dashboard": "dashboard.html",
+        "/dashboard/odoo": "odoo-migration.html",
+        "/dashboard/woocommerce": "wp-to-shopify-migration.html",
+        "/dashboard/messages": "messages.html",
+        "/dashboard/odoo-panel": "odoo-panel.html",
         "/odoo-migration": "odoo-migration.html",
-        "/woocommerce-migration": "woocommerce-migration.html",
+        "/woocommerce-migration": "wp-to-shopify-migration.html",
         "/migration-tool": "odoo_matrixify_browser.html",
         "/admin": "admin_panel.html",
+        "/admin/users": "admin_panel.html",
+        "/admin/jobs": "admin_panel.html",
+        "/admin/payments": "admin_panel.html",
+        "/admin/settings": "admin_panel.html",
         "/favicon.svg": "assets/img/favicon.svg",
         "/odoo_matrixify_converter.js": "odoo_matrixify_converter.js",
-        "/home.html": "home.html",
-        "/services.html": "services.html",
-        "/security.html": "security.html",
+        "/home.html": "frontend_pages.html",
+        "/services.html": "pricing.html",
+        "/security.html": "help.html",
         "/migration-tool-page.html": "migration-tool-page.html",
         "/wp-to-shopify-migration": "wp-to-shopify-migration.html"
     };

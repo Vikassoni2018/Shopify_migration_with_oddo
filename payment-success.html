@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Payment Success | ShopifyMigrate</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/assets/css/saas-platform.css">
+  <script src="/assets/js/saas-platform.js" defer></script>
+</head>
+<body class="platform-body">
+  <div class="top-banner">Confirmation state for a successful migration plan purchase.</div>
+  <main class="page-shell auth-shell">
+    <section class="auth-wrap">
+      <article class="auth-card">
+        <span class="eyebrow">Payment success</span>
+        <h1 class="auth-title">The plan has been confirmed.</h1>
+        <p class="muted">Use this confirmation state as the destination for a real payment processor callback or checkout session completion.</p>
+        <div class="content-grid cols-2" id="successSummary">
+          <div class="metric-card"><span class="metric-value">Professional</span><span class="metric-label">Selected plan</span></div>
+          <div class="metric-card"><span class="metric-value">1,800</span><span class="metric-label">Orders requested</span></div>
+        </div>
+        <div class="button-row">
+          <a class="button-link primary" href="/dashboard">Go to dashboard</a>
+          <a class="button-link secondary" href="/odoo-migration">Start migration</a>
+        </div>
+      </article>
+      <article class="auth-card dark">
+        <span class="eyebrow">What’s next</span>
+        <ul class="check-list">
+          <li>Connect the payment confirmation to store entitlements.</li>
+          <li>Run the relevant Odoo or WooCommerce import route.</li>
+          <li>Monitor the resulting job from the workspace and admin screens.</li>
+        </ul>
+      </article>
+    </section>
+  </main>
+
+  <script>
+    document.addEventListener("DOMContentLoaded", function () {
+      var query = PlatformApp.readQuery();
+      var plan = query.get("plan") || "per_1000";
+      var orders = query.get("orders") || "0";
+      var label = plan === "full" ? "Full migration" : plan === "free" ? "Free trial" : "Professional";
+      document.getElementById("successSummary").innerHTML = [
+        '<div class="metric-card"><span class="metric-value">' + PlatformApp.escapeHtml(label) + '</span><span class="metric-label">Selected plan</span></div>',
+        '<div class="metric-card"><span class="metric-value">' + PlatformApp.escapeHtml(orders) + '</span><span class="metric-label">Orders requested</span></div>'
+      ].join("");
+    });
+  </script>
+</body>
+</html>

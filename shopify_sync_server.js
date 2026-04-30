@@ -245,6 +245,7 @@ async function shopifyRest(shopDomain, accessToken, method, endpoint, payload) {
     return data;
 }
 
+
 function parseEscapedKeyValueLines(text) {
     const input = String(text || "");
     if (!input.trim()) {
@@ -962,7 +963,8 @@ async function handleApiRequest(request, response) {
 function handleStaticRequest(request, response) {
     const url = new URL(request.url, `http://${request.headers.host}`);
 
-    const staticRoutes = {
+    
+        const staticRoutes = {
         "/": "frontend_pages.html",
         "/index.html": "frontend_pages.html",
         "/odoo-migration": "odoo-migration.html",
@@ -973,7 +975,8 @@ function handleStaticRequest(request, response) {
         "/home.html": "home.html",
         "/services.html": "services.html",
         "/security.html": "security.html",
-        "/migration-tool-page.html": "migration-tool-page.html"
+        "/migration-tool-page.html": "migration-tool-page.html",
+        "/woocommerce-import-tabs": "woocommerce-import-tabs.html"
     };
 
     if (staticRoutes[url.pathname]) {

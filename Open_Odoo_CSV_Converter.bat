@@ -1,2 +1,2 @@
 @echo off
-powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0start_local_server.ps1"
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0launch_odoo_to_shopify_web.ps1"

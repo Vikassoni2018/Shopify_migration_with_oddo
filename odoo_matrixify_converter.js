@@ -187,6 +187,26 @@
         "Notes"
     ];
 
+    var DEFAULT_CUSTOMER_HEADERS = [
+        "First Name",
+        "Last Name",
+        "Email",
+        "Accepts Email Marketing",
+        "Default Address Company",
+        "Default Address Address1",
+        "Default Address Address2",
+        "Default Address City",
+        "Default Address Province Code",
+        "Default Address Country Code",
+        "Default Address Zip",
+        "Default Address Phone",
+        "Phone",
+        "Accepts SMS Marketing",
+        "Tags",
+        "Note",
+        "Tax Exempt"
+    ];
+
     var CUSTOMER_MAPPING_ROWS = [
         {
             "Source Column": "Display Name",
@@ -255,12 +275,6 @@
             "Notes": "Preserved in the note because the Shopify customer template has no direct currency column."
         },
         {
-            "Source Column": "Payment Status / Payment Terms",
-            "Shopify Column / Handling": "Tags, Note",
-            "Action": "Derived",
-            "Notes": "Payment metadata is copied into customer tags and note to mirror order-level payment tracking."
-        },
-        {
             "Source Column": "Zip",
             "Shopify Column / Handling": "Default Address Zip",
             "Action": "Renamed",
@@ -271,6 +285,36 @@
             "Shopify Column / Handling": "First Name, Last Name, Note",
             "Action": "Derived",
             "Notes": "Used as a fallback contact/person name when available and preserved in the note."
+        },
+        {
+            "Source Column": "Contact/Name",
+            "Shopify Column / Handling": "New Shopify customer row, First Name, Last Name, Note",
+            "Action": "Creates contact record",
+            "Notes": "When a nested Odoo contact is present, an additional Shopify customer row is created for that contact person."
+        },
+        {
+            "Source Column": "Contact/Email",
+            "Shopify Column / Handling": "New Shopify customer row, Email",
+            "Action": "Copied to contact record",
+            "Notes": "Used as the email for the generated contact-person customer row."
+        },
+        {
+            "Source Column": "Contact/Phone",
+            "Shopify Column / Handling": "New Shopify customer row, Phone, Default Address Phone",
+            "Action": "Copied + Normalized",
+            "Notes": "Used as the contact-person phone when present; parent phone is used as a fallback."
+        },
+        {
+            "Source Column": "Contact/City, Contact/Country, Contact/Complete Address",
+            "Shopify Column / Handling": "New Shopify customer row, Default Address fields",
+            "Action": "Derived",
+            "Notes": "Used as the generated contact-person address, with parent address values used as fallbacks."
+        },
+        {
+            "Source Column": "Contact/Tags",
+            "Shopify Column / Handling": "New Shopify customer row, Tags",
+            "Action": "Copied + Merged",
+            "Notes": "Contact tags are merged with the parent customer's Odoo tags on generated contact-person rows."
         },
         {
             "Source Column": "Gender",
@@ -295,6 +339,12 @@
             "Shopify Column / Handling": "Note",
             "Action": "Copied to note",
             "Notes": "Preserved in the note for audit history."
+        },
+        {
+            "Source Column": "Tags",
+            "Shopify Column / Handling": "Tags",
+            "Action": "Copied + Merged",
+            "Notes": "Odoo tag values are merged into Shopify's comma-separated Tags field. Rows that only contain a tag are attached to the previous customer."
         }
     ];
 
@@ -621,38 +671,114 @@
         };
     }
 
+    function getFirstStringValue(values) {
+        var index;
+        var value;
+
+        for (index = 0; index < values.length; index += 1) {
+            value = getStringValue(values[index]);
+            if (value) {
+                return value;
+            }
+        }
+
+        return "";
+    }
+
+    function getCommaPersonName(value) {
+        var cleaned = getStringValue(value);
+        var parts;
+
+        if (cleaned.indexOf(",") < 0) {
+            return "";
+        }
+
+        parts = cleaned.split(",");
+        return getStringValue(parts.slice(1).join(","));
+    }
+
+    function getCommaParentName(value) {
+        var cleaned = getStringValue(value);
+        var parts;
+
+        if (cleaned.indexOf(",") < 0) {
+            return "";
+        }
+
+        parts = cleaned.split(",");
+        return getStringValue(parts[0]);
+    }
+
     function chooseCustomerName(row) {
         var displayName = getStringValue(row["Display Name"]);
         var contact = getStringValue(row["Contact"]);
         var parentName = getStringValue(row["Parent name"]);
-        var candidate = displayName;
-
-        if (displayName.indexOf(",") >= 0) {
-            var parts = displayName.split(",");
-            if (parts.length >= 2 && getStringValue(parts[1])) {
-                candidate = getStringValue(parts.slice(1).join(","));
-            }
-        }
+        var candidate = getCommaPersonName(displayName) || displayName;
 
         if (!candidate && contact) {
-            candidate = contact;
+            candidate = getCommaPersonName(contact) || contact;
         }
 
-        if (parentName && contact && getStringValue(contact).toLowerCase().indexOf(getStringValue(parentName).toLowerCase()) === 0) {
-            var contactParts = contact.split(",");
-            if (contactParts.length >= 2 && getStringValue(contactParts[1])) {
-                candidate = getStringValue(contactParts.slice(1).join(","));
-            }
+        if (parentName && contact && contact.toLowerCase().indexOf(parentName.toLowerCase()) === 0) {
+            candidate = getCommaPersonName(contact) || candidate;
         }
 
         return splitDisplayName(candidate || displayName || contact);
     }
 
-    function parseCustomerAddress(completeAddress, zip, country, city) {
+    function getNestedContactName(row) {
+        return getFirstStringValue([
+            row["Contact/Name"],
+            getCommaPersonName(row["Contact"]),
+            row["Contact"]
+        ]);
+    }
+
+    function hasNestedContactDetails(row) {
+        return !!getFirstStringValue([
+            row["Contact/Name"],
+            row["Contact/Email"],
+            row["Contact/Phone"],
+            row["Contact/City"],
+            row["Contact/Country"],
+            row["Contact/Tags"],
+            row["Contact/Complete Address"]
+        ]);
+    }
+
+    function hasMainCustomerDetails(row) {
+        return !!getFirstStringValue([
+            row["Display Name"],
+            row["Phone"],
+            row["Email"],
+            row["Activities"],
+            row["City"],
+            row["Country"],
+            row["Company"],
+            row["Complete Address"],
+            row["Contact Address Complete"],
+            row["Zip"],
+            row["Created on"],
+            row["Currency"],
+            row["Gender"],
+            row["Parent name"],
+            row["Channels/Alias Name"],
+            row["Channels/Display Name"]
+        ]);
+    }
+
+    function extractPostalCode(address) {
+        var match = getStringValue(address).match(/(?:^|\D)(\d{6})(?:\D|$)/);
+        return match ? match[1] : "";
+    }
+
+    function parseCustomerAddress(completeAddress, zip, country, city, addressNameToRemove) {
         var normalizedAddress = String(completeAddress || "").replace(/\r\n/g, "\n").replace(/\r/g, "\n");
-        var zipClean = getStringValue(zip).replace(/\s+/g, "");
+        var zipValue = getStringValue(zip) || extractPostalCode(normalizedAddress);
+        var zipClean = zipValue.replace(/\s+/g, "");
         var countryClean = getStringValue(country);
         var countryLower = countryClean.toLowerCase();
+        var removableName = getStringValue(addressNameToRemove).toLowerCase();
         var lines = normalizedAddress.split(/\n+/).map(function (line) {
             return getStringValue(line);
         }).filter(Boolean);
@@ -663,57 +789,135 @@
             return line.replace(/\s+/g, "") !== zipClean;
         });
 
+        if (lines.length && removableName && lines[0].toLowerCase() === removableName) {
+            lines.shift();
+        }
+
         return {
             address1: lines.length ? lines[0] : "",
             address2: lines.length > 1 ? lines.slice(1).join(", ") : "",
-            city: getStringValue(city) || (countryLower === "singapore" ? "Singapore" : "")
+            city: getStringValue(city) || (countryLower === "singapore" ? "Singapore" : ""),
+            zip: zipValue
         };
     }
 
-    function buildCustomerNote(row) {
+    function buildCustomerNote(row, source) {
+        var context = source || {};
         var lines = [];
 
-        if (getStringValue(row["Display Name"])) {
-            lines.push("Odoo Display Name: " + getStringValue(row["Display Name"]));
+        function pushLine(label, value) {
+            var cleaned = getStringValue(value);
+            if (cleaned) {
+                lines.push(label + ": " + cleaned);
+            }
         }
 
-        if (getStringValue(row["Created on"])) {
-            lines.push("Odoo Created on: " + getStringValue(row["Created on"]));
+        if (context.recordType === "contact") {
+            pushLine("Odoo Record Type", "Contact");
+            pushLine("Odoo Parent Customer", context.parentName);
+            pushLine("Odoo Contact Name", context.displayName);
+            pushLine("Odoo Contact Email", row["Contact/Email"]);
+            pushLine("Odoo Contact Phone", row["Contact/Phone"]);
+            pushLine("Odoo Contact Tags", row["Contact/Tags"]);
         }
 
-        if (getStringValue(row["Currency"])) {
-            lines.push("Odoo Currency: " + getStringValue(row["Currency"]));
+        if (context.recordType === "customer") {
+            pushLine("Odoo Record Type", "Customer");
         }
 
-        if (getStringValue(row["Activities"])) {
-            lines.push("Odoo Activities: " + getStringValue(row["Activities"]));
-        }
-
-        if (getStringValue(row["Gender"])) {
-            lines.push("Odoo Gender: " + getStringValue(row["Gender"]));
-        }
-
-        if (getStringValue(row["Parent name"])) {
-            lines.push("Odoo Parent name: " + getStringValue(row["Parent name"]));
-        }
-
-        if (getStringValue(row["Contact"])) {
-            lines.push("Odoo Contact: " + getStringValue(row["Contact"]));
-        }
-
-        if (getStringValue(row["Contact Address Complete"])) {
-            lines.push("Odoo Contact Address Complete: " + getStringValue(row["Contact Address Complete"]));
-        }
-
-        if (getStringValue(row["Channels/Alias Name"])) {
-            lines.push("Odoo Channels Alias Name: " + getStringValue(row["Channels/Alias Name"]));
-        }
-
-        if (getStringValue(row["Channels/Display Name"])) {
-            lines.push("Odoo Channels Display Name: " + getStringValue(row["Channels/Display Name"]));
-        }
+        pushLine("Odoo Display Name", row["Display Name"]);
+        pushLine("Odoo Created on", row["Created on"]);
+        pushLine("Odoo Currency", row["Currency"]);
+        pushLine("Odoo Activities", row["Activities"]);
+        pushLine("Odoo Gender", row["Gender"]);
+        pushLine("Odoo Parent name", row["Parent name"]);
+        pushLine("Odoo Contact", row["Contact"]);
+        pushLine("Odoo Contact Address Complete", row["Contact Address Complete"]);
+        pushLine("Odoo Contact Complete Address", row["Contact/Complete Address"]);
+        pushLine("Odoo Channels Alias Name", row["Channels/Alias Name"]);
+        pushLine("Odoo Channels Display Name", row["Channels/Display Name"]);
 
         return lines.join("\n");
+    }
+
+    function parseCustomerTags(value) {
+        return getStringValue(value).split(/[\r\n,;]+/).map(function (part) {
+            return getStringValue(part);
+        }).filter(Boolean);
+    }
+
+    function appendUniqueValues(target, values) {
+        values.forEach(function (value) {
+            if (target.indexOf(value) === -1) {
+                target.push(value);
+            }
+        });
+    }
+
+    function isCustomerTagOnlyRow(row) {
+        var hasTags = !!getStringValue(row["Tags"]);
+        if (!hasTags) {
+            return false;
+        }
+
+        return Object.keys(row).every(function (key) {
+            if (key === "Tags") {
+                return true;
+            }
+            return getStringValue(row[key]) === "";
+        });
+    }
+
+    function normalizeCustomerRows(odooRows) {
+        var normalizedRows = [];
+        var currentCustomer = null;
+        var currentParentCustomer = null;
+        var mergedTagOnlyRows = 0;
+        var ignoredTagOnlyRows = 0;
+
+        odooRows.forEach(function (row) {
+            var tags = parseCustomerTags(row["Tags"]);
+
+            if (isCustomerTagOnlyRow(row)) {
+                if (currentParentCustomer) {
+                    appendUniqueValues(currentParentCustomer.shopifyTags, tags);
+                    mergedTagOnlyRows += 1;
+                } else if (currentCustomer) {
+                    appendUniqueValues(currentCustomer.shopifyTags, tags);
+                    mergedTagOnlyRows += 1;
+                } else {
+                    ignoredTagOnlyRows += 1;
+                }
+                return;
+            }
+
+            if (!hasMainCustomerDetails(row) && !hasNestedContactDetails(row)) {
+                return;
+            }
+
+            currentCustomer = {};
+            Object.keys(row).forEach(function (key) {
+                currentCustomer[key] = row[key];
+            });
+            currentCustomer.shopifyTags = [];
+            appendUniqueValues(currentCustomer.shopifyTags, tags);
+
+            if (currentParentCustomer && !hasMainCustomerDetails(row) && hasNestedContactDetails(row)) {
+                currentCustomer._parentRow = currentParentCustomer;
+            }
+
+            if (hasMainCustomerDetails(row)) {
+                currentParentCustomer = currentCustomer;
+            }
+
+            normalizedRows.push(currentCustomer);
+        });
+
+        return {
+            rows: normalizedRows,
+            mergedTagOnlyRows: mergedTagOnlyRows,
+            ignoredTagOnlyRows: ignoredTagOnlyRows
+        };
     }
 
     function createEmptyRecord(headers) {
@@ -724,104 +928,266 @@
         return record;
     }
 
-    function buildCustomerRows(templateHeaders, odooRows) {
-        return odooRows.map(function (row) {
-            var record = createEmptyRecord(templateHeaders);
-            var nameParts = chooseCustomerName(row);
-            var addressSource = getStringValue(row["Complete Address"]) || getStringValue(row["Contact Address Complete"]);
-            var address = parseCustomerAddress(addressSource, row["Zip"], row["Country"], row["City"]);
-            var phone = normalizePhone(row["Phone"]);
-            var email = isLikelyEmail(row["Email"]) ? getStringValue(row["Email"]) : "";
-            var company = getStringValue(row["Company"]) || getStringValue(row["Parent name"]);
-            var note = buildCustomerNote(row);
-            var paymentProfile = buildCustomerPaymentProfile(row);
-
-            if (record.hasOwnProperty("First Name")) {
-                record["First Name"] = nameParts.firstName;
-            }
-            if (record.hasOwnProperty("Last Name")) {
-                record["Last Name"] = nameParts.lastName;
-            }
-            if (record.hasOwnProperty("Email")) {
-                record["Email"] = email;
-            }
-            if (record.hasOwnProperty("Accepts Email Marketing")) {
-                record["Accepts Email Marketing"] = "no";
-            }
-            if (record.hasOwnProperty("Default Address Company")) {
-                record["Default Address Company"] = company;
-            }
-            if (record.hasOwnProperty("Default Address Address1")) {
-                record["Default Address Address1"] = address.address1;
-            }
-            if (record.hasOwnProperty("Default Address Address2")) {
-                record["Default Address Address2"] = address.address2;
-            }
-            if (record.hasOwnProperty("Default Address City")) {
-                record["Default Address City"] = address.city;
-            }
-            if (record.hasOwnProperty("Default Address Province Code")) {
-                record["Default Address Province Code"] = "";
-            }
-            if (record.hasOwnProperty("Default Address Country Code")) {
-                record["Default Address Country Code"] = normalizeCountryCode(row["Country"]);
-            }
-            if (record.hasOwnProperty("Default Address Zip")) {
-                record["Default Address Zip"] = getStringValue(row["Zip"]);
-            }
-            if (record.hasOwnProperty("Default Address Phone")) {
-                record["Default Address Phone"] = phone;
-            }
-            if (record.hasOwnProperty("Phone")) {
-                record["Phone"] = phone;
-            }
-            if (record.hasOwnProperty("Accepts SMS Marketing")) {
-                record["Accepts SMS Marketing"] = "no";
-            }
-            if (record.hasOwnProperty("Tags")) {
-                record["Tags"] = paymentProfile.tags;
-            }
-            if (record.hasOwnProperty("Note")) {
-                record["Note"] = [note, paymentProfile.note].filter(Boolean).join("\n");
-            }
-            if (record.hasOwnProperty("Tax Exempt")) {
-                record["Tax Exempt"] = "no";
-            }
-
-            return record;
-        });
-    }
-
-    function buildCustomerPaymentProfile(row) {
-        var paymentStatus = getStringValue(row["Payment Status"]) || getStringValue(row["payment_status"]);
-        var paymentTerms = getStringValue(row["Payment Terms"]) || getStringValue(row["payment_terms"]) || getStringValue(row["Payment Term"]);
-        var paymentReference = getStringValue(row["Payment Reference"]) || getStringValue(row["payment_reference"]);
-        var tags = [];
-        var noteParts = [];
-
-        if (paymentStatus) {
-            tags.push("odoo_payment_status:" + slugifyTagValue(paymentStatus));
-            noteParts.push("Payment Status: " + paymentStatus);
-        }
-        if (paymentTerms) {
-            tags.push("odoo_payment_terms:" + slugifyTagValue(paymentTerms));
-            noteParts.push("Payment Terms: " + paymentTerms);
-        }
-        if (paymentReference) {
-            noteParts.push("Payment Reference: " + paymentReference);
-        }
+    function buildMainCustomerSource(row) {
+        var displayName = getStringValue(row["Display Name"]) || getStringValue(row["Contact"]);
+        var commaParentName = getCommaParentName(row["Display Name"]);
+        var companyFallback = hasNestedContactDetails(row) ? displayName : "";
 
         return {
-            tags: tags.join(", "),
-            note: noteParts.join(" | ")
+            row: row,
+            recordType: "customer",
+            displayName: displayName,
+            originalDisplayName: getStringValue(row["Display Name"]),
+            nameParts: chooseCustomerName(row),
+            email: getStringValue(row["Email"]),
+            phone: getStringValue(row["Phone"]),
+            dedupePhone: getStringValue(row["Phone"]),
+            addressSource: getStringValue(row["Complete Address"]) || getStringValue(row["Contact Address Complete"]),
+            addressNameToRemove: commaParentName || getStringValue(row["Display Name"]),
+            zip: getStringValue(row["Zip"]),
+            country: getStringValue(row["Country"]),
+            city: getStringValue(row["City"]),
+            company: getFirstStringValue([row["Company"], row["Parent name"], commaParentName, companyFallback]),
+            parentName: commaParentName,
+            tags: Array.isArray(row.shopifyTags) ? row.shopifyTags.slice() : []
         };
     }
 
-    function slugifyTagValue(value) {
-        return getStringValue(value)
-            .toLowerCase()
-            .replace(/[^a-z0-9]+/g, "_")
-            .replace(/^_+|_+$/g, "");
+    function buildContactCustomerSource(row) {
+        var parentRow = row._parentRow || row;
+        var contactName = getNestedContactName(row);
+        var contactEmail = getStringValue(row["Contact/Email"]);
+        var contactPhone = getStringValue(row["Contact/Phone"]);
+        var parentPhone = getFirstStringValue([row["Phone"], parentRow["Phone"]]);
+        var contactNormalizedPhone = normalizePhone(contactPhone);
+        var parentNormalizedPhone = normalizePhone(parentPhone);
+        var contactPhoneForShopify = contactPhone;
+        var parentName = getFirstStringValue([
+            getCommaParentName(row["Contact"]),
+            row["Display Name"],
+            parentRow["Display Name"],
+            row["Company"],
+            row["Parent name"],
+            parentRow["Company"],
+            parentRow["Parent name"]
+        ]);
+        var addressSource = getFirstStringValue([
+            row["Contact/Complete Address"],
+            row["Contact Address Complete"],
+            row["Complete Address"],
+            parentRow["Contact Address Complete"],
+            parentRow["Complete Address"]
+        ]);
+        var tags = [];
+
+        if (!contactName && !contactEmail && !contactPhone) {
+            return null;
+        }
+
+        if (!contactPhone || (contactNormalizedPhone && contactNormalizedPhone === parentNormalizedPhone)) {
+            contactPhoneForShopify = "";
+        }
+
+        appendUniqueValues(tags, Array.isArray(parentRow.shopifyTags) ? parentRow.shopifyTags : []);
+        appendUniqueValues(tags, Array.isArray(row.shopifyTags) ? row.shopifyTags : []);
+        appendUniqueValues(tags, parseCustomerTags(row["Contact/Tags"]));
+
+        return {
+            row: row,
+            recordType: "contact",
+            displayName: contactName || contactEmail || contactPhone,
+            originalDisplayName: getStringValue(row["Display Name"]),
+            nameParts: splitDisplayName(contactName || contactEmail || contactPhone),
+            email: contactEmail,
+            phone: contactPhoneForShopify,
+            dedupePhone: contactPhoneForShopify,
+            parentPhone: parentPhone,
+            addressSource: addressSource,
+            addressNameToRemove: parentName,
+            zip: getFirstStringValue([row["Contact/Zip"], row["Zip"], parentRow["Zip"], extractPostalCode(addressSource)]),
+            country: getFirstStringValue([row["Contact/Country"], row["Country"], parentRow["Country"]]),
+            city: getFirstStringValue([row["Contact/City"], row["City"], parentRow["City"]]),
+            company: getFirstStringValue([row["Company"], row["Parent name"], parentRow["Company"], parentName]),
+            parentName: parentName,
+            tags: tags
+        };
+    }
+
+    function getCustomerSourceKey(source) {
+        var email = getStringValue(source.email).toLowerCase();
+        var phone = normalizePhone(source.dedupePhone || source.phone);
+        var name = getStringValue((source.nameParts.firstName + " " + source.nameParts.lastName).replace(/\s+/g, " "));
+        var company = getStringValue(source.company || source.parentName).toLowerCase();
+
+        if (email && isLikelyEmail(email)) {
+            return "email:" + email;
+        }
+
+        if (phone) {
+            return "phone:" + phone;
+        }
+
+        if (name) {
+            return "name:" + name.toLowerCase() + "|company:" + company;
+        }
+
+        return "";
+    }
+
+    function mergeCustomerSource(target, source) {
+        var sourcePhoneMatchesParent = target.recordType === "contact" &&
+            normalizePhone(source.phone) &&
+            normalizePhone(source.phone) === normalizePhone(target.parentPhone);
+
+        appendUniqueValues(target.tags, source.tags || []);
+
+        if (!target.email && source.email) {
+            target.email = source.email;
+        }
+        if (!target.phone && source.phone && !sourcePhoneMatchesParent) {
+            target.phone = source.phone;
+        }
+        if (!target.dedupePhone && source.dedupePhone && !sourcePhoneMatchesParent) {
+            target.dedupePhone = source.dedupePhone;
+        }
+        if (!target.addressSource && source.addressSource) {
+            target.addressSource = source.addressSource;
+        }
+        if (!target.zip && source.zip) {
+            target.zip = source.zip;
+        }
+        if (!target.country && source.country) {
+            target.country = source.country;
+        }
+        if (!target.city && source.city) {
+            target.city = source.city;
+        }
+        if (!target.company && source.company) {
+            target.company = source.company;
+        }
+    }
+
+    function dedupeCustomerSources(sources) {
+        var seen = {};
+        var output = [];
+
+        sources.forEach(function (source) {
+            var key = getCustomerSourceKey(source);
+
+            if (key && seen[key]) {
+                mergeCustomerSource(seen[key], source);
+                return;
+            }
+
+            output.push(source);
+            if (key) {
+                seen[key] = source;
+            }
+        });
+
+        return output;
+    }
+
+    function buildCustomerSources(odooRows) {
+        var sources = [];
+
+        odooRows.forEach(function (row) {
+            var contactSource;
+
+            if (hasMainCustomerDetails(row)) {
+                sources.push(buildMainCustomerSource(row));
+            }
+
+            if (hasNestedContactDetails(row)) {
+                contactSource = buildContactCustomerSource(row);
+                if (contactSource) {
+                    sources.push(contactSource);
+                }
+            }
+        });
+
+        return dedupeCustomerSources(sources);
+    }
+
+    function buildCustomerRecord(templateHeaders, source) {
+        var row = source.row;
+        var record = createEmptyRecord(templateHeaders);
+        var nameParts = source.nameParts || splitDisplayName(source.displayName);
+        var address = parseCustomerAddress(source.addressSource, source.zip, source.country, source.city, source.addressNameToRemove || source.company);
+        var phone = normalizePhone(source.phone);
+        var email = isLikelyEmail(source.email) ? getStringValue(source.email) : "";
+        var company = getStringValue(source.company);
+        var note = buildCustomerNote(row, source);
+        var tags = Array.isArray(source.tags) ? source.tags.join(", ") : "";
+
+        if (record.hasOwnProperty("First Name")) {
+            record["First Name"] = nameParts.firstName;
+        }
+        if (record.hasOwnProperty("Last Name")) {
+            record["Last Name"] = nameParts.lastName;
+        }
+        if (record.hasOwnProperty("Email")) {
+            record["Email"] = email;
+        }
+        if (record.hasOwnProperty("Accepts Email Marketing")) {
+            record["Accepts Email Marketing"] = "no";
+        }
+        if (record.hasOwnProperty("Default Address Company")) {
+            record["Default Address Company"] = company;
+        }
+        if (record.hasOwnProperty("Default Address Address1")) {
+            record["Default Address Address1"] = address.address1;
+        }
+        if (record.hasOwnProperty("Default Address Address2")) {
+            record["Default Address Address2"] = address.address2;
+        }
+        if (record.hasOwnProperty("Default Address City")) {
+            record["Default Address City"] = address.city;
+        }
+        if (record.hasOwnProperty("Default Address Province Code")) {
+            record["Default Address Province Code"] = "";
+        }
+        if (record.hasOwnProperty("Default Address Country Code")) {
+            record["Default Address Country Code"] = normalizeCountryCode(source.country);
+        }
+        if (record.hasOwnProperty("Default Address Zip")) {
+            record["Default Address Zip"] = address.zip;
+        }
+        if (record.hasOwnProperty("Default Address Phone")) {
+            record["Default Address Phone"] = phone;
+        }
+        if (record.hasOwnProperty("Phone")) {
+            record["Phone"] = phone;
+        }
+        if (record.hasOwnProperty("Accepts SMS Marketing")) {
+            record["Accepts SMS Marketing"] = "no";
+        }
+        if (record.hasOwnProperty("Tags")) {
+            record["Tags"] = tags;
+        }
+        if (record.hasOwnProperty("Note")) {
+            record["Note"] = note;
+        }
+        if (record.hasOwnProperty("Tax Exempt")) {
+            record["Tax Exempt"] = "no";
+        }
+
+        return record;
+    }
+
+    function buildCustomerData(templateHeaders, odooRows) {
+        var customerSources = buildCustomerSources(odooRows);
+
+        return {
+            customerSources: customerSources,
+            customerRows: customerSources.map(function (source) {
+                return buildCustomerRecord(templateHeaders, source);
+            })
+        };
+    }
+
+    function buildCustomerRows(templateHeaders, odooRows) {
+        return buildCustomerData(templateHeaders, odooRows).customerRows;
     }
 
     function buildOrders(sourceRows) {
@@ -1050,22 +1416,34 @@
         var settings = options || {};
         var templateDocument = parseCsvDocument(templateCsvText);
         var odooDocument = parseCsvDocument(odooCsvText);
+        var normalizedCustomerData = normalizeCustomerRows(odooDocument.rows);
 
-        if (!templateDocument.headers.length) {
-            throw new Error("The Shopify customer template file is empty.");
+        if (!templateDocument.headers.some(function (header) {
+            return !!getStringValue(header);
+        })) {
+            templateDocument = {
+                headers: DEFAULT_CUSTOMER_HEADERS.slice(),
+                rows: []
+            };
         }
 
         if (!odooDocument.rows.length) {
             throw new Error("The Odoo customer CSV does not contain any data rows.");
         }
 
-        var customerRows = buildCustomerRows(templateDocument.headers, odooDocument.rows);
+        var customerData = buildCustomerData(templateDocument.headers, normalizedCustomerData.rows);
+        var customerRows = customerData.customerRows;
+        var customerSources = customerData.customerSources;
         var customerFileName = settings.customerFileName || "customers.shopify.csv";
         var mappingFileName = settings.mappingFileName || "customers.mapping.csv";
+        var customersWithTags = customerRows.filter(function (row) {
+            return !!getStringValue(row["Tags"]);
+        }).length;
 
         return {
             templateHeaders: templateDocument.headers.slice(),
-            odooRows: odooDocument.rows,
+            odooRows: normalizedCustomerData.rows,
+            customerSources: customerSources,
             customerRows: customerRows,
             mappingRows: CUSTOMER_MAPPING_ROWS.slice(),
             customerCsvText: toCsv(customerRows, templateDocument.headers),
@@ -1075,13 +1453,21 @@
             stats: {
                 templateColumns: templateDocument.headers.length,
                 odooColumns: odooDocument.headers.length,
-                customersParsed: odooDocument.rows.length,
-                customersWithEmail: odooDocument.rows.filter(function (row) {
+                sourceRowsRead: odooDocument.rows.length,
+                sourceCustomerRowsParsed: normalizedCustomerData.rows.length,
+                customersParsed: customerRows.length,
+                contactRecordsCreated: customerSources.filter(function (source) {
+                    return source.recordType === "contact";
+                }).length,
+                customersWithEmail: customerRows.filter(function (row) {
                     return !!getStringValue(row["Email"]);
                 }).length,
-                customersWithPhone: odooDocument.rows.filter(function (row) {
+                customersWithPhone: customerRows.filter(function (row) {
                     return !!normalizePhone(row["Phone"]);
-                }).length
+                }).length,
+                customersWithTags: customersWithTags,
+                mergedTagOnlyRows: normalizedCustomerData.mergedTagOnlyRows,
+                ignoredTagOnlyRows: normalizedCustomerData.ignoredTagOnlyRows
             }
         };
     }

@@ -336,7 +336,7 @@
 
         .stats-grid {
             display: grid;
-            grid-template-columns: repeat(4, minmax(0, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
             gap: 16px;
         }
 
@@ -437,9 +437,6 @@
         .hidden {
             display: none;
         }
-        .tabs-nav { display:flex; gap:10px; margin:20px 0 8px; flex-wrap:wrap; }
-        .tab-btn { border:1px solid var(--line); background:#fff; color:var(--ink); }
-        .tab-btn.active { background:var(--accent); color:#fff; }
 
         @media (max-width: 980px) {
             .hero {
@@ -458,15 +455,15 @@
     <div class="shell">
         <section class="hero">
             <article class="hero-card">
-                <span class="eyebrow">Shopify Sync Workspace</span>
+                <span class="eyebrow">Local Shopify Sync</span>
                 <h1>Upload Odoo CSV. Connect Shopify. Create missing orders and update existing ones.</h1>
                 <p class="hero-copy">
-                    This app prepares the CSV for Matrixify and can also push orders directly into Shopify. Existing orders are updated with Shopify's safe order update fields instead of creating duplicates, whether you run it locally or from Render.
+                    This local app keeps your Admin API token on your machine, prepares the CSV for Matrixify, and can also push orders directly into Shopify. Existing orders are updated with Shopify's safe order update fields instead of creating duplicates.
                 </p>
                 <div class="hero-grid">
                     <div class="mini">
-                        <strong>Environment-aware token flow</strong>
-                        <span>The access token is submitted only to this app's API endpoint and is never stored in your Git repository.</span>
+                        <strong>Local token handling</strong>
+                        <span>The access token is sent only to the localhost app, not to a hosted website.</span>
                     </div>
                     <div class="mini">
                         <strong>Create or update</strong>
@@ -490,7 +487,7 @@
                         </div>
                         <div class="field">
                             <label for="timeZoneOffset">Order time offset</label>
-                            <input id="timeZoneOffset" type="text" value="" placeholder="UTC offset like +05:30 or +08:00">
+                            <input id="timeZoneOffset" type="text" value="+08:00" placeholder="Singapore time UTC+08:00">
                         </div>
                         <div class="field field-full">
                             <label for="accessToken">Admin API access token</label>
@@ -591,25 +588,52 @@
             <div class="status" id="jobStatus"></div>
         </section>
 
-        <section class="section">
-            <div class="tabs-nav" id="toolTabs">
-                <button class="tab-btn active" data-tab="ordersTab">Order Sync</button>
-                <button class="tab-btn" data-tab="wooProductTab">WooCommerce Product Migration</button>
+        <section class="section hidden" id="batchImportSection">
+            <div class="card">
+                <h2>Import to Shopify in 1,000-order batches</h2>
+                <p>The uploaded Odoo CSV is split by order number. Import one batch at a time so Shopify's order-create limits are easier to manage.</p>
+                <div class="status" id="batchStatus"></div>
             </div>
-            <div id="ordersTab">
+
+            <div class="table-card" id="batchProgressCard">
+                <div class="preview-top">
+                    <div>
+                        <h3>Batch import list</h3>
+                        <p>Each row imports only that batch of order references through the normal Shopify import flow.</p>
+                    </div>
+                </div>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Batch</th>
+                                <th>Orders</th>
+                                <th>Order Range</th>
+                                <th>Estimated Time</th>
+                                <th>Status</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="batchBody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <section class="section">
             <div class="card">
                 <h2>Customer CSV Mapping</h2>
-                <p>Upload the Shopify customer template CSV and the Odoo <code>res.partner.csv</code>. This section only prepares a manual Shopify customer import CSV and does not call the Shopify API.</p>
+                <p>Upload the Odoo <code>res.partner.csv</code>. A Shopify template CSV is optional; without one, the app uses the standard Shopify customer import columns. Odoo tag rows are merged automatically, and nested contact details are exported as additional Shopify customer rows.</p>
                 <div class="form-grid">
                     <div class="field field-full">
                         <label class="dropzone" id="customerTemplateDropzone">
                             <input class="file-input" id="customerTemplateInput" type="file" accept=".csv,text/csv">
                             <h3>Select Shopify customer template CSV</h3>
-                            <p>Use the template exported or downloaded from Shopify so the output columns match exactly.</p>
+                            <p>Optional. Use a Shopify template only when you need a specific column order.</p>
                         </label>
                         <div class="meta-box" id="customerTemplateMeta">
-                            <strong>No Shopify template selected yet</strong>
-                            <span>Choose the Shopify customer template CSV first.</span>
+                            <strong>Using default Shopify columns</strong>
+                            <span>Select a Shopify template only if you need a custom column order.</span>
                         </div>
                     </div>
 
@@ -632,49 +656,6 @@
                 </div>
                 <div class="status" id="customerStatus"></div>
             </div>
-            </div>
-        </section>
-
-        <section class="section hidden" id="wooProductTab">
-            <div class="card">
-                <h2>WooCommerce Product CSV → Shopify Product CSV + Direct Shopify Upsert</h2>
-                <p>Two methods: (1) direct CSV conversion for Shopify import, (2) connect Shopify and push products directly (create/update by Handle).</p>
-                <div class="form-grid">
-                    <div class="field">
-                        <label for="wooShopDomain">Shopify domain</label>
-                        <input id="wooShopDomain" type="text" placeholder="your-store.myshopify.com">
-                    </div>
-                    <div class="field">
-                        <label for="wooAccessToken">Shopify Admin API token</label>
-                        <input id="wooAccessToken" type="password" placeholder="shpat_...">
-                    </div>
-                    <div class="field">
-                        <label for="wooApiBase">Sync API base URL (optional)</label>
-                        <input id="wooApiBase" type="text" placeholder="https://shopify-migration-with-oddo.onrender.com">
-                    </div>
-                    <div class="field field-full">
-                        <label class="dropzone" id="wooDropzone">
-                            <input class="file-input" id="wooFileInput" type="file" accept=".csv,text/csv">
-                            <h3>Select WooCommerce Product CSV</h3>
-                            <p>Upload WooCommerce product export CSV. The app maps fields to Shopify product CSV fields and supports direct sync.</p>
-                        </label>
-                        <div class="meta-box" id="wooMeta"><strong>No WooCommerce file selected yet</strong><span>Choose WooCommerce products CSV.</span></div>
-                    </div>
-                </div>
-                <div class="actions">
-                    <button class="primary" id="prepareWooButton" disabled>Prepare Shopify Product CSV</button>
-                    <button class="secondary" id="downloadWooButton" disabled>Download Shopify Product CSV</button>
-                    <button class="warn" id="syncWooButton" disabled>Create / Update Products in Shopify</button>
-                </div>
-                <div class="status" id="wooStatus"></div>
-            </div>
-        </section>
-
-        <section class="section hidden" id="wooFieldTab">
-            <div class="preview-card">
-                <div class="preview-top"><div><h3>Field Coverage (WooCommerce + Shopify)</h3><p>Mapped fields used for conversion and direct sync.</p></div></div>
-                <div class="table-wrap"><table><thead><tr><th>WooCommerce Field</th><th>Shopify Field</th></tr></thead><tbody id="wooFieldBody"></tbody></table></div>
-            </div>
         </section>
 
         <section class="section hidden" id="customerPreviewSection">
@@ -684,7 +665,7 @@
                 <div class="preview-top">
                     <div>
                         <h3>Prepared Shopify customer preview</h3>
-                        <p>The first five mapped customer rows are shown here before you import them manually into Shopify.</p>
+                        <p>The first five mapped customer rows are shown here before you import them manually into Shopify, including the merged Shopify tags.</p>
                     </div>
                 </div>
                 <div class="table-wrap">
@@ -696,6 +677,7 @@
                                 <th>Email</th>
                                 <th>Country Code</th>
                                 <th>Zip</th>
+                                <th>Tags</th>
                                 <th>Note</th>
                             </tr>
                         </thead>
@@ -711,7 +693,6 @@
         (function () {
             "use strict";
 
-            var appConfig = window.APP_CONFIG || {};
             var converter = window.OdooMatrixifyConverter;
             var shopDomainInput = document.getElementById("shopDomain");
             var accessTokenInput = document.getElementById("accessToken");
@@ -737,6 +718,9 @@
             var jobWarnings = document.getElementById("jobWarnings");
             var jobStatus = document.getElementById("jobStatus");
             var downloadResultsButton = document.getElementById("downloadResultsButton");
+            var batchImportSection = document.getElementById("batchImportSection");
+            var batchStatus = document.getElementById("batchStatus");
+            var batchBody = document.getElementById("batchBody");
             var customerTemplateInput = document.getElementById("customerTemplateInput");
             var customerOdooInput = document.getElementById("customerOdooInput");
             var customerTemplateDropzone = document.getElementById("customerTemplateDropzone");
@@ -750,18 +734,6 @@
             var customerPreviewSection = document.getElementById("customerPreviewSection");
             var customerStats = document.getElementById("customerStats");
             var customerPreviewBody = document.getElementById("customerPreviewBody");
-            var toolTabs = document.getElementById("toolTabs");
-            var ordersTab = document.getElementById("ordersTab");
-            var wooProductTab = document.getElementById("wooProductTab");
-            var wooFileInput = document.getElementById("wooFileInput");
-            var wooDropzone = document.getElementById("wooDropzone");
-            var wooMeta = document.getElementById("wooMeta");
-            var prepareWooButton = document.getElementById("prepareWooButton");
-            var downloadWooButton = document.getElementById("downloadWooButton");
-            var syncWooButton = document.getElementById("syncWooButton");
-            var wooStatus = document.getElementById("wooStatus");
-            var wooFieldBody = document.getElementById("wooFieldBody");
-            var wooApiBaseInput = document.getElementById("wooApiBase");
 
             var selectedFile = null;
             var previewResult = null;
@@ -769,15 +741,13 @@
             var currentJobId = "";
             var currentPollHandle = 0;
             var importInProgress = false;
+            var importBatches = [];
+            var activeBatchIndex = -1;
             var selectedCustomerTemplateFile = null;
             var selectedCustomerOdooFile = null;
             var customerResult = null;
-            var wooFile = null;
-            var wooCsvResult = "";
-            var wooRows = [];
-            var wooFieldPairs = [
-                ["ID","Variant SKU"],["Type","Type"],["SKU","Variant SKU"],["Name","Title"],["Published","Published"],["Is featured?","Tags"],["Visibility in catalog","Published"],["Short description","Body (HTML)"],["Description","Body (HTML)"],["Date sale price starts","Variant Compare At Price"],["Date sale price ends","Variant Compare At Price"],["Tax status","Variant Taxable"],["Tax class","Variant Tax Code"],["In stock?","Variant Inventory Qty"],["Stock","Variant Inventory Qty"],["Backorders allowed?","Variant Inventory Policy"],["Sold individually?","Variant Inventory Policy"],["Weight (lbs)","Variant Grams"],["Length (in)","Variant Requires Shipping"],["Width (in)","Variant Requires Shipping"],["Height (in)","Variant Requires Shipping"],["Allow customer reviews?","SEO Description"],["Purchase note","Tags"],["Sale price","Variant Price"],["Regular price","Variant Compare At Price"],["Categories","Tags"],["Tags","Tags"],["Shipping class","Variant Fulfillment Service"],["Images","Image Src"],["Download limit","Variant Taxable"],["Download expiry days","Variant Taxable"],["Parent","Handle"],["Grouped products","Handle"],["Upsells","Tags"],["Cross-sells","Tags"],["External URL","Variant Barcode"],["Button text","SEO Title"],["Position","Image Position"],["Attribute 1 name","Option1 Name"],["Attribute 1 value(s)","Option1 Value"],["Attribute 2 name","Option2 Name"],["Attribute 2 value(s)","Option2 Value"],["Attribute 3 name","Option3 Name"],["Attribute 3 value(s)","Option3 Value"],["Meta: _yoast_wpseo_title","SEO Title"],["Meta: _yoast_wpseo_metadesc","SEO Description"]
-            ];
+            var IMPORT_BATCH_SIZE = 1000;
+            var ESTIMATED_SECONDS_PER_ORDER = 13;
 
             function formatFileSize(bytes) {
                 if (!Number.isFinite(bytes)) {
@@ -791,26 +761,25 @@
                 }
                 return (bytes / (1024 * 1024)).toFixed(2) + " MB";
             }
-            function parseCsv(text) {
-                var lines = String(text || "").split(/\r?\n/).filter(Boolean);
-                if (!lines.length) { return []; }
-                var headers = lines[0].split(",").map(function (h) { return h.replace(/^\"|\"$/g, "").trim(); });
-                return lines.slice(1).map(function (line) {
-                    var cols = line.split(",");
-                    var row = {};
-                    headers.forEach(function (h, i) { row[h] = (cols[i] || "").replace(/^\"|\"$/g, ""); });
-                    return row;
-                });
-            }
-            function prepareWooCsvText(rows) {
-                var headers = ["Handle","Title","Body (HTML)","Vendor","Type","Tags","Published","Option1 Name","Option1 Value","Option2 Name","Option2 Value","Option3 Name","Option3 Value","Variant SKU","Variant Grams","Variant Inventory Qty","Variant Inventory Policy","Variant Fulfillment Service","Variant Price","Variant Compare At Price","Variant Requires Shipping","Variant Taxable","Image Src","Image Position","SEO Title","SEO Description"];
-                var out = [headers.join(",")];
-                rows.forEach(function (r) {
-                    var handle = (r.Name || "product").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
-                    var mapped = [handle,r.Name || "",(r.Description || r["Short description"] || "").replace(/\n/g, " "),r["Attribute 1 value(s)"] || "",r.Type || "","" + (r.Categories || "") + "," + (r.Tags || ""),(r.Published || "1"),r["Attribute 1 name"] || "Title",r["Attribute 1 value(s)"] || "Default Title",r["Attribute 2 name"] || "",r["Attribute 2 value(s)"] || "",r["Attribute 3 name"] || "",r["Attribute 3 value(s)"] || "",r.SKU || "",String(Math.round(parseFloat(r["Weight (lbs)"] || "0") * 453.592) || 0),r.Stock || "0",(r["Backorders allowed?"] === "1" ? "continue" : "deny"),"manual",r["Sale price"] || r["Regular price"] || "0",r["Regular price"] || "", "TRUE","TRUE",(r.Images || "").split(",")[0] || "","1",r["Meta: _yoast_wpseo_title"] || r.Name || "",r["Meta: _yoast_wpseo_metadesc"] || ""];
-                    out.push(mapped.map(function (x) { return "\"" + String(x || "").replace(/\"/g, "\"\"") + "\""; }).join(","));
-                });
-                return out.join("\n");
+
+            function formatDuration(totalSeconds) {
+                var seconds = Math.max(0, Math.ceil(totalSeconds || 0));
+                var hours = Math.floor(seconds / 3600);
+                var minutes = Math.floor((seconds % 3600) / 60);
+                var remainingSeconds = seconds % 60;
+                var parts = [];
+
+                if (hours) {
+                    parts.push(hours + "h");
+                }
+                if (minutes) {
+                    parts.push(minutes + "m");
+                }
+                if (!hours && !minutes) {
+                    parts.push(remainingSeconds + "s");
+                }
+
+                return parts.join(" ");
             }
 
             function setStatus(element, message, type) {
@@ -836,105 +805,12 @@
                 }, 1000);
             }
 
-            function normalizeApiBase(base) {
-                var value = String(base || "").trim();
-                return value ? value.replace(/\/+$/, "") : "";
-            }
-
-            function getConfiguredApiBase() {
-                return normalizeApiBase(appConfig.defaultApiBaseUrl || "");
-            }
-
-            function getLocalApiBase() {
-                return normalizeApiBase(appConfig.localApiBaseUrl || "http://127.0.0.1:3456");
-            }
-
-            function getDefaultTimeZoneOffset() {
-                var value = String(
-                    window.localStorage.getItem("timeZoneOffset")
-                    || appConfig.defaultTimeZoneOffset
-                    || timeZoneOffsetInput.value
-                    || "+08:00"
-                ).trim();
-
-                return /^([+-]\d{2}:\d{2}|Z)$/.test(value) ? value : "+08:00";
-            }
-
-            function buildSyncServerHelpMessage() {
-                var renderBase = getConfiguredApiBase() || "https://shopify-migration-with-oddo.onrender.com";
-                var localBase = getLocalApiBase() || "http://127.0.0.1:3456";
-                return "Cannot reach the sync server. If hosted on Render, set \"Sync API base URL\" to " + renderBase + ". Do not include /odoo-migration in this field. For local mode use " + localBase + ".";
-            }
-
-            function getApiBase() {
-                var base = normalizeApiBase(wooApiBaseInput && wooApiBaseInput.value ? wooApiBaseInput.value : "");
-                if (!base) {
-                    base = normalizeApiBase(window.localStorage.getItem("wooApiBase") || "");
-                }
-                if (!base) {
-                    base = getConfiguredApiBase();
-                }
-                if (!base && window.location && window.location.origin && window.location.protocol !== "file:") {
-                    base = normalizeApiBase(window.location.origin);
-                }
-                if (!base) {
-                    base = getLocalApiBase();
-                }
-                if (!base) {
-                    return "";
-                }
-                if (!/^https?:\/\//i.test(base) && base.charAt(0) !== "/") {
-                    base = "https://" + base;
-                }
-                try {
-                    var parsed = new URL(base, window.location.origin);
-                    return parsed.origin;
-                } catch (error) {
-                    return normalizeApiBase(base);
-                }
-            }
-
-            function toApiUrl(path, baseOverride) {
-                var cleanPath = path.charAt(0) === "/" ? path : ("/" + path);
-                var base = normalizeApiBase(baseOverride || getApiBase() || "");
-                return base ? (base + cleanPath) : cleanPath;
-            }
-
-            async function fetchWithFallback(path, options) {
-                var candidates = [];
-
-                function addCandidate(value) {
-                    var candidate = normalizeApiBase(value);
-                    if (candidate && candidates.indexOf(candidate) === -1) {
-                        candidates.push(candidate);
-                    }
-                }
-
-                addCandidate(getApiBase());
-                if (window.location && window.location.origin && window.location.protocol !== "file:") {
-                    addCandidate(window.location.origin);
-                }
-                addCandidate(getConfiguredApiBase());
-                addCandidate(getLocalApiBase());
-
-                var lastError = null;
-                for (var index = 0; index < candidates.length; index += 1) {
-                    try {
-                        return await fetch(toApiUrl(path, candidates[index]), options || {});
-                    } catch (error) {
-                        lastError = error;
-                    }
-                }
-
-                throw lastError || new Error("No API base URL could be resolved.");
-            }
-
             async function postJson(url, payload) {
                 var response;
                 var data;
 
                 try {
-                    response = await fetchWithFallback(url, {
+                    response = await fetch(url, {
                         method: "POST",
                         headers: {
                             "Content-Type": "application/json"
@@ -942,13 +818,13 @@
                         body: JSON.stringify(payload)
                     });
                 } catch (error) {
-                    throw new Error(buildSyncServerHelpMessage());
+                    throw new Error("Cannot reach the local sync server. Open the app from Open_Odoo_CSV_Converter.bat and make sure the browser URL is http://127.0.0.1:3456.");
                 }
 
                 try {
                     data = await response.json();
                 } catch (error) {
-                    throw new Error("The sync server returned an invalid response.");
+                    throw new Error("The local sync server returned an invalid response.");
                 }
 
                 if (!response.ok || !data.ok) {
@@ -962,15 +838,15 @@
                 var data;
 
                 try {
-                    response = await fetchWithFallback(url);
+                    response = await fetch(url);
                 } catch (error) {
-                    throw new Error(buildSyncServerHelpMessage());
+                    throw new Error("Cannot reach the local sync server. Open the app from Open_Odoo_CSV_Converter.bat and make sure the browser URL is http://127.0.0.1:3456.");
                 }
 
                 try {
                     data = await response.json();
                 } catch (error) {
-                    throw new Error("The sync server returned an invalid response.");
+                    throw new Error("The local sync server returned an invalid response.");
                 }
 
                 if (!response.ok || !data.ok) {
@@ -980,28 +856,24 @@
             }
 
             function refreshActionStates() {
+                var canImport = selectedFile && previewResult && connectedShop;
+                var hasMultipleBatches = importBatches.length > 1;
+
                 previewButton.disabled = !selectedFile;
                 downloadOrdersButton.disabled = !previewResult;
                 downloadMappingButton.disabled = !previewResult;
-                importButton.disabled = importInProgress || !(selectedFile && previewResult && connectedShop);
+                importButton.textContent = hasMultipleBatches ? "Use Batch List Below" : "Import to Shopify";
+                importButton.disabled = importInProgress || !canImport || hasMultipleBatches;
+                Array.from(batchBody.querySelectorAll("[data-batch-index]")).forEach(function (button) {
+                    var batch = importBatches[Number(button.getAttribute("data-batch-index"))];
+                    button.disabled = importInProgress || !canImport || !batch || batch.status === "running";
+                });
             }
 
             function refreshCustomerActionStates() {
-                prepareCustomerButton.disabled = !(selectedCustomerTemplateFile && selectedCustomerOdooFile);
+                prepareCustomerButton.disabled = !selectedCustomerOdooFile;
                 downloadCustomerButton.disabled = !customerResult;
                 downloadCustomerMappingButton.disabled = !customerResult;
-            }
-            function refreshWooStates() {
-                prepareWooButton.disabled = !wooFile;
-                downloadWooButton.disabled = !wooCsvResult;
-                syncWooButton.disabled = !(wooRows.length && document.getElementById("wooShopDomain").value && document.getElementById("wooAccessToken").value);
-            }
-            async function syncWooProducts() {
-                setStatus(wooStatus, "Syncing WooCommerce products to Shopify...", "info");
-                try {
-                    var response = await postJson("/api/products/sync", { shopDomain: document.getElementById("wooShopDomain").value, accessToken: document.getElementById("wooAccessToken").value, products: wooRows });
-                    setStatus(wooStatus, "Sync completed. Created: " + response.summary.created + ", Updated: " + response.summary.updated + ", Failed: " + response.summary.failed, "ok");
-                } catch (error) { setStatus(wooStatus, error.message, "error"); }
             }
 
             function renderConnection() {
@@ -1053,18 +925,126 @@
                 });
             }
 
-            function renderPreview() {
-                if (!previewResult) {
-                    setHidden(previewSection, true);
+            function getPreviewOrderReferences() {
+                var references = [];
+                var seen = Object.create(null);
+
+                if (!previewResult || !previewResult.matrixifyRows) {
+                    return references;
+                }
+
+                previewResult.matrixifyRows.forEach(function (row) {
+                    var reference = String(row.Name || "").trim();
+                    if (!reference || seen[reference]) {
+                        return;
+                    }
+
+                    seen[reference] = true;
+                    references.push(reference);
+                });
+
+                return references;
+            }
+
+            function buildImportBatches() {
+                var references = getPreviewOrderReferences();
+                var batches = [];
+                var index;
+
+                for (index = 0; index < references.length; index += IMPORT_BATCH_SIZE) {
+                    var orderReferences = references.slice(index, index + IMPORT_BATCH_SIZE);
+                    batches.push({
+                        number: batches.length + 1,
+                        orderReferences: orderReferences,
+                        firstOrder: orderReferences[0] || "",
+                        lastOrder: orderReferences[orderReferences.length - 1] || "",
+                        status: "pending",
+                        message: "",
+                        jobId: "",
+                        summary: null
+                    });
+                }
+
+                return batches;
+            }
+
+            function getBatchEstimateText(batch) {
+                return formatDuration((batch.orderReferences.length || 0) * ESTIMATED_SECONDS_PER_ORDER);
+            }
+
+            function renderBatchList() {
+                batchBody.innerHTML = "";
+
+                if (!importBatches.length) {
+                    setHidden(batchImportSection, true);
+                    setStatus(batchStatus, "", "");
                     return;
                 }
 
-                renderStats(previewStats, [
+                importBatches.forEach(function (batch, index) {
+                    var tr = document.createElement("tr");
+                    var actionCell;
+                    var button;
+                    var statusText = batch.status;
+
+                    if (batch.summary) {
+                        statusText += " · created " + batch.summary.createdOrders +
+                            ", updated " + batch.summary.updatedOrders +
+                            ", failed " + batch.summary.failedOrders;
+                    }
+
+                    [
+                        "Batch " + batch.number,
+                        batch.orderReferences.length,
+                        batch.firstOrder + " to " + batch.lastOrder,
+                        getBatchEstimateText(batch),
+                        batch.message || statusText
+                    ].forEach(function (value) {
+                        var td = document.createElement("td");
+                        td.textContent = value || "";
+                        tr.appendChild(td);
+                    });
+
+                    actionCell = document.createElement("td");
+                    button = document.createElement("button");
+                    button.className = "secondary";
+                    button.type = "button";
+                    button.textContent = batch.status === "completed" ? "Import Again" : "Import Batch";
+                    button.setAttribute("data-batch-index", String(index));
+                    actionCell.appendChild(button);
+                    tr.appendChild(actionCell);
+                    batchBody.appendChild(tr);
+                });
+
+                setHidden(batchImportSection, false);
+                setStatus(
+                    batchStatus,
+                    importBatches.length + " batch(es). Estimated time for 1,000 orders: " + formatDuration(IMPORT_BATCH_SIZE * ESTIMATED_SECONDS_PER_ORDER) + ".",
+                    "info"
+                );
+                refreshActionStates();
+            }
+
+            function renderPreview() {
+                if (!previewResult) {
+                    setHidden(previewSection, true);
+                    setHidden(batchImportSection, true);
+                    return;
+                }
+
+                importBatches = buildImportBatches();
+                renderBatchList();
+
+                var previewItems = [
                     { label: "Orders parsed", value: previewResult.stats.ordersParsed },
                     { label: "Output rows", value: previewResult.stats.matrixifyRowsWritten },
                     { label: "Phones normalized", value: previewResult.stats.ordersWithNormalizedPhone },
-                    { label: "Quantity assumptions", value: previewResult.stats.ordersWithQuantityAssumptions }
-                ]);
+                    { label: "Quantity assumptions", value: previewResult.stats.ordersWithQuantityAssumptions },
+                    { label: "Import batches", value: importBatches.length },
+                    { label: "1,000 order estimate", value: formatDuration(IMPORT_BATCH_SIZE * ESTIMATED_SECONDS_PER_ORDER) }
+                ];
+
+                renderStats(previewStats, previewItems);
 
                 previewBody.innerHTML = "";
                 previewResult.matrixifyRows.slice(0, 5).forEach(function (row) {
@@ -1094,9 +1074,14 @@
                 }
 
                 renderStats(customerStats, [
-                    { label: "Template columns", value: customerResult.stats.templateColumns },
-                    { label: "Odoo columns", value: customerResult.stats.odooColumns },
-                    { label: "Customers parsed", value: customerResult.stats.customersParsed },
+                    // { label: "Template columns", value: customerResult.stats.templateColumns },
+                    // { label: "Odoo columns", value: customerResult.stats.odooColumns },
+                    // { label: "Source rows read", value: customerResult.stats.sourceRowsRead },
+                    { label: "Source customer rows", value: customerResult.stats.sourceCustomerRowsParsed },
+                    { label: "Shopify customer rows", value: customerResult.stats.customersParsed },
+                    // { label: "Contact records created", value: customerResult.stats.contactRecordsCreated },
+                    { label: "Customers with tags", value: customerResult.stats.customersWithTags },
+                    // { label: "Tag rows merged", value: customerResult.stats.mergedTagOnlyRows },
                     { label: "Customers with email", value: customerResult.stats.customersWithEmail }
                 ]);
 
@@ -1109,6 +1094,7 @@
                         row["Email"],
                         row["Default Address Country Code"],
                         row["Default Address Zip"],
+                        row["Tags"],
                         row["Note"]
                     ].forEach(function (value) {
                         var td = document.createElement("td");
@@ -1128,7 +1114,8 @@
                     { label: "Total orders", value: job.summary.totalOrders },
                     { label: "Processed", value: job.summary.processedOrders },
                     { label: "Created", value: job.summary.createdOrders },
-                    { label: "Updated", value: job.summary.updatedOrders }
+                    { label: "Updated", value: job.summary.updatedOrders },
+                    { label: "Failed", value: job.summary.failedOrders }
                 ]);
 
                 jobBody.innerHTML = "";
@@ -1166,7 +1153,7 @@
                 if (job.status === "running" || job.status === "queued") {
                     importInProgress = true;
                     refreshActionStates();
-                    setStatus(jobStatus, "Import is running. Existing Shopify orders are updated only with note, phone, and custom attributes.", "info");
+                    setStatus(jobStatus, job.statusMessage || "Import is running. Existing Shopify orders are updated only with note, phone, and custom attributes.", "info");
                 } else if (job.status === "completed") {
                     importInProgress = false;
                     refreshActionStates();
@@ -1175,6 +1162,26 @@
                     importInProgress = false;
                     refreshActionStates();
                     setStatus(jobStatus, job.error || "Import failed.", "error");
+                }
+
+                if (activeBatchIndex >= 0 && importBatches[activeBatchIndex]) {
+                    var activeBatch = importBatches[activeBatchIndex];
+                    activeBatch.summary = job.summary;
+
+                    if (job.status === "running" || job.status === "queued") {
+                        activeBatch.status = "running";
+                        activeBatch.message = "Processed " + job.summary.processedOrders + " of " + job.summary.totalOrders;
+                    } else if (job.status === "completed") {
+                        activeBatch.status = job.summary.failedOrders ? "completed with failures" : "completed";
+                        activeBatch.message = "Created " + job.summary.createdOrders + ", updated " + job.summary.updatedOrders + ", failed " + job.summary.failedOrders;
+                        activeBatchIndex = -1;
+                    } else if (job.status === "failed") {
+                        activeBatch.status = "failed";
+                        activeBatch.message = job.error || "Import failed.";
+                        activeBatchIndex = -1;
+                    }
+
+                    renderBatchList();
                 }
             }
 
@@ -1206,7 +1213,11 @@
             function setSelectedFile(file) {
                 selectedFile = file || null;
                 previewResult = null;
+                importBatches = [];
+                activeBatchIndex = -1;
                 setHidden(previewSection, true);
+                setHidden(batchImportSection, true);
+                batchBody.innerHTML = "";
                 updateFileMeta();
                 refreshActionStates();
                 setStatus(fileStatus, selectedFile ? "CSV selected. Preview it before importing." : "", selectedFile ? "info" : "");
@@ -1219,8 +1230,8 @@
                 updateCustomerFileMeta(
                     customerTemplateMeta,
                     selectedCustomerTemplateFile,
-                    "No Shopify template selected yet",
-                    "Choose the Shopify customer template CSV first.",
+                    "Using default Shopify columns",
+                    "Select a Shopify template only if you need a custom column order.",
                     "Shopify template ready"
                 );
                 refreshCustomerActionStates();
@@ -1239,7 +1250,7 @@
                     "Odoo customer file ready"
                 );
                 refreshCustomerActionStates();
-                setStatus(customerStatus, selectedCustomerOdooFile ? "Odoo customer CSV selected." : "", selectedCustomerOdooFile ? "info" : "");
+                setStatus(customerStatus, selectedCustomerOdooFile ? "Odoo customer CSV selected. Tags and nested contacts will be prepared for Shopify." : "", selectedCustomerOdooFile ? "info" : "");
             }
 
             async function connectStore() {
@@ -1280,9 +1291,10 @@
                     });
                     renderPreview();
                     refreshActionStates();
-                    setStatus(fileStatus, "Preview is ready. You can download the CSVs or import directly into Shopify.", "ok");
+                    setStatus(fileStatus, "Preview is ready. Orders are split into " + importBatches.length + " import batch(es).", "ok");
                 } catch (error) {
                     previewResult = null;
+                    importBatches = [];
                     renderPreview();
                     refreshActionStates();
                     setStatus(fileStatus, error && error.message ? error.message : "Preview failed.", "error");
@@ -1291,30 +1303,56 @@
                 }
             }
 
-            async function startImport() {
+            async function startImport(batchIndex) {
                 if (!selectedFile || !previewResult || !connectedShop) {
                     return;
                 }
 
+                var batch = Number.isInteger(batchIndex) ? importBatches[batchIndex] : null;
                 importButton.disabled = true;
                 importInProgress = true;
-                setStatus(jobStatus, "Starting Shopify import job...", "info");
+                activeBatchIndex = batch ? batchIndex : -1;
+
+                if (batch) {
+                    batch.status = "running";
+                    batch.message = "Starting import...";
+                    renderBatchList();
+                }
+
+                setStatus(jobStatus, batch ? "Starting Shopify import job for batch " + batch.number + "..." : "Starting Shopify import job...", "info");
 
                 try {
                     var csvText = await selectedFile.text();
-                    var response = await postJson("/api/import/start", {
+                    var payload = {
                         shopDomain: shopDomainInput.value,
                         accessToken: accessTokenInput.value,
-                        timeZoneOffset: (timeZoneOffsetInput.value || "").trim() || getDefaultTimeZoneOffset(),
+                        timeZoneOffset: (timeZoneOffsetInput.value || "").trim() || "+08:00",
                         csvText: csvText
-                    });
+                    };
+
+                    if (batch) {
+                        payload.orderReferences = batch.orderReferences;
+                        payload.batchLabel = "Batch " + batch.number;
+                    }
+
+                    var response = await postJson("/api/import/start", payload);
 
                     currentJobId = response.job.id;
+                    if (batch) {
+                        batch.jobId = currentJobId;
+                        batch.message = "Running job " + currentJobId;
+                        renderBatchList();
+                    }
                     renderJob(response.job);
                     stopPolling();
                     pollJob(currentJobId);
                 } catch (error) {
                     importInProgress = false;
+                    if (batch) {
+                        batch.status = "failed";
+                        batch.message = error.message;
+                        renderBatchList();
+                    }
                     setStatus(jobStatus, error.message, "error");
                 } finally {
                     refreshActionStates();
@@ -1326,7 +1364,7 @@
             }
 
             async function prepareCustomerCsv() {
-                if (!(selectedCustomerTemplateFile && selectedCustomerOdooFile)) {
+                if (!selectedCustomerOdooFile) {
                     return;
                 }
 
@@ -1334,7 +1372,7 @@
                 setStatus(customerStatus, "Preparing Shopify customer CSV...", "info");
 
                 try {
-                    var templateText = await selectedCustomerTemplateFile.text();
+                    var templateText = selectedCustomerTemplateFile ? await selectedCustomerTemplateFile.text() : "";
                     var odooText = await selectedCustomerOdooFile.text();
                     var baseName = fileNameWithoutExtension(selectedCustomerOdooFile.name);
 
@@ -1345,14 +1383,14 @@
 
                     renderCustomerPreview();
                     refreshCustomerActionStates();
-                    setStatus(customerStatus, "Customer CSV is ready. Download it and import it manually into Shopify customers.", "ok");
+                    setStatus(customerStatus, "Customer CSV is ready. Nested Odoo contacts were created as Shopify customer rows, and tags were included in the export.", "ok");
                 } catch (error) {
                     customerResult = null;
                     renderCustomerPreview();
                     refreshCustomerActionStates();
                     setStatus(customerStatus, error && error.message ? error.message : "Customer conversion failed.", "error");
                 } finally {
-                    prepareCustomerButton.disabled = !(selectedCustomerTemplateFile && selectedCustomerOdooFile);
+                    prepareCustomerButton.disabled = !selectedCustomerOdooFile;
                 }
             }
 
@@ -1433,33 +1471,6 @@
                     : null;
                 setSelectedCustomerOdooFile(file);
             });
-            wooFileInput.addEventListener("change", function (event) {
-                wooFile = event.target.files && event.target.files[0] ? event.target.files[0] : null;
-                wooCsvResult = ""; wooRows = [];
-                wooMeta.innerHTML = wooFile ? ("<strong>" + wooFile.name + "</strong><span>" + formatFileSize(wooFile.size) + " · ready</span>") : "<strong>No WooCommerce file selected yet</strong><span>Choose WooCommerce products CSV.</span>";
-                refreshWooStates();
-            });
-            prepareWooButton.addEventListener("click", async function () {
-                if (!wooFile) { return; }
-                var text = await wooFile.text();
-                wooRows = parseCsv(text);
-                wooCsvResult = prepareWooCsvText(wooRows);
-                setStatus(wooStatus, "Shopify product CSV prepared.", "ok");
-                wooFieldBody.innerHTML = "";
-                wooFieldPairs.forEach(function (pair) { var tr = document.createElement("tr"); tr.innerHTML = "<td>" + pair[0] + "</td><td>" + pair[1] + "</td>"; wooFieldBody.appendChild(tr); });
-                setHidden(document.getElementById("wooFieldTab"), false);
-                refreshWooStates();
-            });
-            downloadWooButton.addEventListener("click", function () { if (wooCsvResult) { downloadText("woocommerce.shopify.products.csv", wooCsvResult); } });
-            syncWooButton.addEventListener("click", function () { syncWooProducts(); });
-            toolTabs.addEventListener("click", function (event) {
-                if (!event.target.matches(".tab-btn")) { return; }
-                var tab = event.target.getAttribute("data-tab");
-                Array.prototype.forEach.call(toolTabs.querySelectorAll(".tab-btn"), function (b) { b.classList.remove("active"); });
-                event.target.classList.add("active");
-                setHidden(ordersTab, tab !== "ordersTab");
-                setHidden(wooProductTab, tab !== "wooProductTab");
-            });
 
             previewButton.addEventListener("click", function () {
                 previewCsv();
@@ -1481,6 +1492,15 @@
 
             importButton.addEventListener("click", function () {
                 startImport();
+            });
+
+            batchBody.addEventListener("click", function (event) {
+                var button = event.target.closest("[data-batch-index]");
+                if (!button) {
+                    return;
+                }
+
+                startImport(Number(button.getAttribute("data-batch-index")));
             });
 
             prepareCustomerButton.addEventListener("click", function () {
@@ -1505,29 +1525,13 @@
                 if (!currentJobId) {
                     return;
                 }
-                window.location.href = toApiUrl("/api/jobs/" + encodeURIComponent(currentJobId) + "/results.csv");
+                window.location.href = "/api/jobs/" + encodeURIComponent(currentJobId) + "/results.csv";
             });
-
-            if (wooApiBaseInput) {
-                wooApiBaseInput.placeholder = getConfiguredApiBase() || "https://shopify-migration-with-oddo.onrender.com";
-                wooApiBaseInput.value = window.localStorage.getItem("wooApiBase") || getConfiguredApiBase() || "";
-                wooApiBaseInput.addEventListener("input", function () {
-                    window.localStorage.setItem("wooApiBase", wooApiBaseInput.value.trim());
-                });
-            }
-
-            if (timeZoneOffsetInput) {
-                timeZoneOffsetInput.value = getDefaultTimeZoneOffset();
-                timeZoneOffsetInput.addEventListener("input", function () {
-                    window.localStorage.setItem("timeZoneOffset", timeZoneOffsetInput.value.trim());
-                });
-            }
 
             renderConnection();
             updateFileMeta();
             refreshActionStates();
             refreshCustomerActionStates();
-            refreshWooStates();
         }());
     </script>
 </body>

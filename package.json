@@ -1,0 +1,14 @@
+{
+  "name": "odoo-shopify-order-sync",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Render-ready Odoo CSV to Shopify order import tool.",
+  "main": "shopify_sync_server.js",
+  "scripts": {
+    "start": "node shopify_sync_server.js",
+    "check": "node --check shopify_sync_server.js"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

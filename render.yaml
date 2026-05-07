@@ -1,0 +1,33 @@
+services:
+  - type: web
+    name: odoo-shopify-order-sync
+    runtime: node
+    repo: https://github.com/Vikassoni2018/Shopify_migration_with_oddo
+    branch: backgroundjob
+    autoDeployTrigger: commit
+    plan: starter
+    region: singapore
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /healthz
+    disk:
+      name: import-data
+      mountPath: /var/data
+      sizeGB: 1
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: HOST
+        value: 0.0.0.0
+      - key: DATA_DIR
+        value: /var/data
+      - key: ORDER_CREATE_SPACING_MS
+        value: "13000"
+      - key: SHOPIFY_THROTTLE_RETRY_WAIT_MS
+        value: "65000"
+      - key: SHOPIFY_THROTTLE_MAX_ATTEMPTS
+        value: "8"
+      - key: SHOPIFY_SHOP_DOMAIN
+        sync: false
+      - key: SHOPIFY_ACCESS_TOKEN
+        sync: false

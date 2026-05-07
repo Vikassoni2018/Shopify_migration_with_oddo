@@ -6,9 +6,10 @@ const converter = require("./odoo_matrixify_converter.js");
 
 const PORT = Number(process.env.PORT || 3456);
 const API_VERSION = "2026-04";
-const HOST = "127.0.0.1";
+const HOST = process.env.HOST || (process.env.RENDER ? "0.0.0.0" : "127.0.0.1");
 const MAX_JSON_BODY_BYTES = 100 * 1024 * 1024;
-const LOG_DIR = path.join(__dirname, "logs");
+const DATA_DIR = process.env.DATA_DIR ? path.resolve(process.env.DATA_DIR) : __dirname;
+const LOG_DIR = path.join(DATA_DIR, "logs");
 const IMPORT_LOG_PATH = path.join(LOG_DIR, "shopify_import_debug.log");
 const ORDER_CREATE_SPACING_MS = Number(process.env.ORDER_CREATE_SPACING_MS || 13000);
 const SHOPIFY_THROTTLE_RETRY_WAIT_MS = Number(process.env.SHOPIFY_THROTTLE_RETRY_WAIT_MS || 65000);
@@ -807,8 +808,8 @@ function appendJobResult(job, result) {
 }
 
 async function connectShop(payload, context) {
-    const shopDomain = normalizeShopDomain(payload.shopDomain);
-    const accessToken = String(payload.accessToken || "").trim();
+    const shopDomain = normalizeShopDomain(payload.shopDomain || process.env.SHOPIFY_SHOP_DOMAIN);
+    const accessToken = String(payload.accessToken || process.env.SHOPIFY_ACCESS_TOKEN || "").trim();
 
     if (!shopDomain) {
         throw new Error("Enter a valid Shopify domain.");
@@ -1175,6 +1176,14 @@ async function handleApiRequest(request, response) {
 
 function handleStaticRequest(request, response) {
     const url = new URL(request.url, `http://${request.headers.host}`);
+
+    if (url.pathname === "/healthz") {
+        sendJson(response, 200, {
+            ok: true,
+            service: "odoo-shopify-order-sync"
+        });
+        return;
+    }
 
     if (url.pathname === "/" || url.pathname === "/index.html") {
         sendFile(response, path.join(__dirname, "odoo_matrixify_browser.html"));

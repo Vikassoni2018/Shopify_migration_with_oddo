@@ -620,6 +620,40 @@
             </div>
         </section>
 
+        <section class="section" id="savedImportsSection">
+            <div class="card">
+                <div class="preview-top">
+                    <div>
+                        <h2>Saved Render imports</h2>
+                        <p>Saved CSV plans stay on Render disk, so you can close the browser and reopen this page to see batch progress or resume a stopped batch.</p>
+                    </div>
+                    <div class="actions" style="margin-top:0">
+                        <button class="secondary" id="refreshSavedImportsButton">Refresh Saved Imports</button>
+                    </div>
+                </div>
+                <div class="status" id="savedImportsStatus"></div>
+            </div>
+
+            <div class="table-card">
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>CSV</th>
+                                <th>Orders</th>
+                                <th>Batches</th>
+                                <th>Processed</th>
+                                <th>Updated</th>
+                                <th>Pending</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="savedImportsBody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
         <section class="section">
             <div class="card">
                 <h2>Customer CSV Mapping</h2>
@@ -721,6 +755,9 @@
             var batchImportSection = document.getElementById("batchImportSection");
             var batchStatus = document.getElementById("batchStatus");
             var batchBody = document.getElementById("batchBody");
+            var savedImportsBody = document.getElementById("savedImportsBody");
+            var savedImportsStatus = document.getElementById("savedImportsStatus");
+            var refreshSavedImportsButton = document.getElementById("refreshSavedImportsButton");
             var customerTemplateInput = document.getElementById("customerTemplateInput");
             var customerOdooInput = document.getElementById("customerOdooInput");
             var customerTemplateDropzone = document.getElementById("customerTemplateDropzone");
@@ -743,6 +780,9 @@
             var importInProgress = false;
             var importBatches = [];
             var activeBatchIndex = -1;
+            var importPlanId = "";
+            var activeImportPlan = null;
+            var savedImportPlans = [];
             var selectedCustomerTemplateFile = null;
             var selectedCustomerOdooFile = null;
             var customerResult = null;
@@ -856,7 +896,10 @@
             }
 
             function refreshActionStates() {
-                var canImport = selectedFile && previewResult && connectedShop;
+                var hasPreparedUpload = selectedFile && previewResult;
+                var hasSavedPlan = !!importPlanId;
+                var hasConnectionInput = connectedShop || shopDomainInput.value.trim() || accessTokenInput.value.trim() || hasSavedPlan;
+                var canImport = (hasPreparedUpload || hasSavedPlan) && hasConnectionInput;
                 var hasMultipleBatches = importBatches.length > 1;
 
                 previewButton.disabled = !selectedFile;
@@ -968,8 +1011,43 @@
                 return batches;
             }
 
+            function normalizeImportBatch(batch) {
+                var references = Array.isArray(batch.orderReferences) ? batch.orderReferences : [];
+
+                return {
+                    number: batch.number,
+                    orderReferences: references,
+                    orderCount: batch.orderCount || references.length,
+                    firstOrder: batch.firstOrder || references[0] || "",
+                    lastOrder: batch.lastOrder || references[references.length - 1] || "",
+                    status: batch.status || "pending",
+                    message: batch.message || "",
+                    jobId: batch.jobId || "",
+                    summary: batch.summary || null
+                };
+            }
+
+            function applyImportPlan(plan) {
+                activeImportPlan = plan || null;
+                importPlanId = plan && plan.id ? plan.id : "";
+                importBatches = plan && Array.isArray(plan.batches)
+                    ? plan.batches.map(normalizeImportBatch)
+                    : [];
+                activeBatchIndex = -1;
+                renderBatchList();
+                refreshActionStates();
+            }
+
+            function getBatchOrderCount(batch) {
+                if (batch.orderReferences && batch.orderReferences.length) {
+                    return batch.orderReferences.length;
+                }
+
+                return batch.orderCount || 0;
+            }
+
             function getBatchEstimateText(batch) {
-                return formatDuration((batch.orderReferences.length || 0) * ESTIMATED_SECONDS_PER_ORDER);
+                return formatDuration(getBatchOrderCount(batch) * ESTIMATED_SECONDS_PER_ORDER);
             }
 
             function renderBatchList() {
@@ -985,7 +1063,8 @@
                     var tr = document.createElement("tr");
                     var actionCell;
                     var button;
-                    var statusText = batch.status;
+                    var statusText = batch.status === "completed_with_failures" ? "completed with failures" : batch.status;
+                    var orderCount = getBatchOrderCount(batch);
 
                     if (batch.summary) {
                         statusText += " · created " + batch.summary.createdOrders +
@@ -995,7 +1074,7 @@
 
                     [
                         "Batch " + batch.number,
-                        batch.orderReferences.length,
+                        orderCount,
                         batch.firstOrder + " to " + batch.lastOrder,
                         getBatchEstimateText(batch),
                         batch.message || statusText
@@ -1009,7 +1088,7 @@
                     button = document.createElement("button");
                     button.className = "secondary";
                     button.type = "button";
-                    button.textContent = batch.status === "completed" ? "Import Again" : "Import Batch";
+                    button.textContent = batch.status === "completed" || batch.status === "completed_with_failures" ? "View Job" : batch.jobId ? "Resume Batch" : "Import Batch";
                     button.setAttribute("data-batch-index", String(index));
                     actionCell.appendChild(button);
                     tr.appendChild(actionCell);
@@ -1019,7 +1098,7 @@
                 setHidden(batchImportSection, false);
                 setStatus(
                     batchStatus,
-                    importBatches.length + " batch(es). Estimated time for 1,000 orders: " + formatDuration(IMPORT_BATCH_SIZE * ESTIMATED_SECONDS_PER_ORDER) + ".",
+                    (activeImportPlan ? "Saved import " + activeImportPlan.id + ". " : "") + importBatches.length + " batch(es). Estimated time for 1,000 orders: " + formatDuration(IMPORT_BATCH_SIZE * ESTIMATED_SECONDS_PER_ORDER) + ".",
                     "info"
                 );
                 refreshActionStates();
@@ -1065,6 +1144,88 @@
                 });
 
                 setHidden(previewSection, false);
+            }
+
+            function renderSavedImports() {
+                savedImportsBody.innerHTML = "";
+
+                if (!savedImportPlans.length) {
+                    var emptyRow = document.createElement("tr");
+                    var emptyCell = document.createElement("td");
+                    emptyCell.colSpan = 7;
+                    emptyCell.textContent = "No saved imports yet.";
+                    emptyRow.appendChild(emptyCell);
+                    savedImportsBody.appendChild(emptyRow);
+                    return;
+                }
+
+                savedImportPlans.forEach(function (plan) {
+                    var tr = document.createElement("tr");
+                    var summary = plan.summary || {};
+                    var pendingOrders = Math.max(0, (summary.totalOrders || 0) - (summary.processedOrders || 0));
+                    var actionCell;
+                    var button;
+
+                    [
+                        (plan.sourceFileName || "Odoo CSV") + " (" + formatFileSize(plan.csvBytes || 0) + ")",
+                        summary.totalOrders || plan.totalOrders || 0,
+                        (summary.completedBatches || 0) + " done / " + (summary.totalBatches || 0),
+                        summary.processedOrders || 0,
+                        "created " + (summary.createdOrders || 0) + ", updated " + (summary.updatedOrders || 0) + ", failed " + (summary.failedOrders || 0),
+                        pendingOrders
+                    ].forEach(function (value) {
+                        var td = document.createElement("td");
+                        td.textContent = value || "";
+                        tr.appendChild(td);
+                    });
+
+                    actionCell = document.createElement("td");
+                    button = document.createElement("button");
+                    button.className = "secondary";
+                    button.type = "button";
+                    button.textContent = "Open Batches";
+                    button.setAttribute("data-import-plan-id", plan.id);
+                    actionCell.appendChild(button);
+                    tr.appendChild(actionCell);
+                    savedImportsBody.appendChild(tr);
+                });
+            }
+
+            async function loadSavedImports() {
+                try {
+                    var response = await getJson("/api/import-plans");
+                    savedImportPlans = response.plans || [];
+                    renderSavedImports();
+                    setStatus(savedImportsStatus, savedImportPlans.length ? "Saved imports loaded from Render disk." : "No saved imports on Render disk yet.", savedImportPlans.length ? "ok" : "info");
+                } catch (error) {
+                    setStatus(savedImportsStatus, error.message, "error");
+                }
+            }
+
+            async function saveImportPlanToServer(csvText) {
+                var response = await postJson("/api/import-plans", {
+                    csvText: csvText,
+                    sourceFileName: selectedFile ? selectedFile.name : "odoo-orders.csv",
+                    timeZoneOffset: (timeZoneOffsetInput.value || "").trim() || "+08:00"
+                });
+
+                applyImportPlan(response.plan);
+                loadSavedImports();
+                return response.plan;
+            }
+
+            async function openSavedImport(planId) {
+                try {
+                    var response = await getJson("/api/import-plans/" + encodeURIComponent(planId));
+                    previewResult = null;
+                    selectedFile = null;
+                    updateFileMeta();
+                    applyImportPlan(response.plan);
+                    setHidden(previewSection, true);
+                    setStatus(fileStatus, "Saved CSV opened from Render disk. Choose a pending batch to import or resume.", "ok");
+                } catch (error) {
+                    setStatus(savedImportsStatus, error.message, "error");
+                }
             }
 
             function renderCustomerPreview() {
@@ -1113,6 +1274,7 @@
                 renderStats(jobStats, [
                     { label: "Total orders", value: job.summary.totalOrders },
                     { label: "Processed", value: job.summary.processedOrders },
+                    { label: "Pending", value: job.pendingOrders || Math.max(0, job.summary.totalOrders - job.summary.processedOrders) },
                     { label: "Created", value: job.summary.createdOrders },
                     { label: "Updated", value: job.summary.updatedOrders },
                     { label: "Failed", value: job.summary.failedOrders }
@@ -1172,13 +1334,15 @@
                         activeBatch.status = "running";
                         activeBatch.message = "Processed " + job.summary.processedOrders + " of " + job.summary.totalOrders;
                     } else if (job.status === "completed") {
-                        activeBatch.status = job.summary.failedOrders ? "completed with failures" : "completed";
+                        activeBatch.status = job.summary.failedOrders ? "completed_with_failures" : "completed";
                         activeBatch.message = "Created " + job.summary.createdOrders + ", updated " + job.summary.updatedOrders + ", failed " + job.summary.failedOrders;
                         activeBatchIndex = -1;
+                        loadSavedImports();
                     } else if (job.status === "failed") {
                         activeBatch.status = "failed";
                         activeBatch.message = job.error || "Import failed.";
                         activeBatchIndex = -1;
+                        loadSavedImports();
                     }
 
                     renderBatchList();
@@ -1215,6 +1379,8 @@
                 previewResult = null;
                 importBatches = [];
                 activeBatchIndex = -1;
+                importPlanId = "";
+                activeImportPlan = null;
                 setHidden(previewSection, true);
                 setHidden(batchImportSection, true);
                 batchBody.innerHTML = "";
@@ -1290,10 +1456,19 @@
                         mappingFileName: "odoo_to_matrixify_column_mapping.csv"
                     });
                     renderPreview();
+                    try {
+                        await saveImportPlanToServer(csvText);
+                    } catch (planError) {
+                        setStatus(fileStatus, "Preview is ready, but the CSV was not saved to Render disk: " + planError.message, "error");
+                        refreshActionStates();
+                        return;
+                    }
                     refreshActionStates();
-                    setStatus(fileStatus, "Preview is ready. Orders are split into " + importBatches.length + " import batch(es).", "ok");
+                    setStatus(fileStatus, "Preview is ready and saved on Render disk. Orders are split into " + importBatches.length + " import batch(es).", "ok");
                 } catch (error) {
                     previewResult = null;
+                    importPlanId = "";
+                    activeImportPlan = null;
                     importBatches = [];
                     renderPreview();
                     refreshActionStates();
@@ -1304,14 +1479,21 @@
             }
 
             async function startImport(batchIndex) {
-                if (!selectedFile || !previewResult || !connectedShop) {
+                if (!importPlanId && (!selectedFile || !previewResult)) {
                     return;
                 }
 
                 var batch = Number.isInteger(batchIndex) ? importBatches[batchIndex] : null;
+                var effectiveBatchIndex = Number.isInteger(batchIndex) ? batchIndex : -1;
+
+                if (!batch && importPlanId && importBatches.length === 1) {
+                    batch = importBatches[0];
+                    effectiveBatchIndex = 0;
+                }
+
                 importButton.disabled = true;
                 importInProgress = true;
-                activeBatchIndex = batch ? batchIndex : -1;
+                activeBatchIndex = batch ? effectiveBatchIndex : -1;
 
                 if (batch) {
                     batch.status = "running";
@@ -1322,22 +1504,41 @@
                 setStatus(jobStatus, batch ? "Starting Shopify import job for batch " + batch.number + "..." : "Starting Shopify import job...", "info");
 
                 try {
-                    var csvText = await selectedFile.text();
                     var payload = {
                         shopDomain: shopDomainInput.value,
                         accessToken: accessTokenInput.value,
-                        timeZoneOffset: (timeZoneOffsetInput.value || "").trim() || "+08:00",
-                        csvText: csvText
+                        timeZoneOffset: (timeZoneOffsetInput.value || "").trim() || "+08:00"
                     };
+                    var response;
 
-                    if (batch) {
+                    if (importPlanId && batch) {
+                        response = await postJson(
+                            "/api/import-plans/" + encodeURIComponent(importPlanId) + "/batches/" + encodeURIComponent(batch.number) + "/start",
+                            payload
+                        );
+                    } else {
+                        var csvText = await selectedFile.text();
+                        payload.csvText = csvText;
+                        payload.sourceFileName = selectedFile ? selectedFile.name : "";
+                    }
+
+                    if (!response && batch) {
                         payload.orderReferences = batch.orderReferences;
                         payload.batchLabel = "Batch " + batch.number;
                     }
 
-                    var response = await postJson("/api/import/start", payload);
+                    if (!response) {
+                        response = await postJson("/api/import/start", payload);
+                    }
 
                     currentJobId = response.job.id;
+                    if (response.plan) {
+                        activeImportPlan = response.plan;
+                        importPlanId = response.plan.id;
+                        importBatches = response.plan.batches.map(normalizeImportBatch);
+                        activeBatchIndex = batch ? effectiveBatchIndex : -1;
+                        batch = activeBatchIndex >= 0 ? importBatches[activeBatchIndex] : null;
+                    }
                     if (batch) {
                         batch.jobId = currentJobId;
                         batch.message = "Running job " + currentJobId;
@@ -1503,6 +1704,19 @@
                 startImport(Number(button.getAttribute("data-batch-index")));
             });
 
+            savedImportsBody.addEventListener("click", function (event) {
+                var button = event.target.closest("[data-import-plan-id]");
+                if (!button) {
+                    return;
+                }
+
+                openSavedImport(button.getAttribute("data-import-plan-id"));
+            });
+
+            refreshSavedImportsButton.addEventListener("click", function () {
+                loadSavedImports();
+            });
+
             prepareCustomerButton.addEventListener("click", function () {
                 prepareCustomerCsv();
             });
@@ -1532,6 +1746,7 @@
             updateFileMeta();
             refreshActionStates();
             refreshCustomerActionStates();
+            loadSavedImports();
         }());
     </script>
 </body>

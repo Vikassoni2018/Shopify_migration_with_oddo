@@ -1369,7 +1369,7 @@
 
             var additionalDetails = getAdditionalDetails(order, actualLineCount, targetLineCount);
             var lineDistributionNote = targetLineCount > actualLineCount ? "Assumed extra quantity on duplicated first line item" : "";
-            var orderNote = "Imported from Odoo CSV for Matrixify. Historical line prices were distributed from the order total because the source file had no line-level prices.";
+            var orderNote = "Imported from Odoo CSV. Historical line prices were distributed from the order total because the source file had no line-level prices.";
 
             expandedLines.forEach(function (line, index) {
                 var lineProperties = [];

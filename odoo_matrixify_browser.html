@@ -818,12 +818,33 @@
                 element.classList.toggle("hidden", !!hidden);
             }
 
-            function loadStoredShopifyCredentials() {
+            async function loadStoredShopifyCredentials() {
+                var loadedFromBrowser = false;
                 try {
                     shopDomainInput.value = window.localStorage.getItem(SHOPIFY_DOMAIN_STORAGE_KEY) || shopDomainInput.value || "";
                     accessTokenInput.value = window.localStorage.getItem(SHOPIFY_TOKEN_STORAGE_KEY) || accessTokenInput.value || "";
+                    loadedFromBrowser = !!(shopDomainInput.value.trim() && accessTokenInput.value.trim());
                 } catch (error) {
                     setStatus(connectStatus, "Saved Shopify credentials could not be loaded in this browser.", "error");
+                }
+
+                if (loadedFromBrowser) {
+                    return;
+                }
+
+                try {
+                    var response = await getJson("/api/connection");
+                    if (response.shopDomain) {
+                        shopDomainInput.value = response.shopDomain;
+                    }
+                    if (response.accessToken) {
+                        accessTokenInput.value = response.accessToken;
+                    }
+                    if (response.hasConnection) {
+                        setStatus(connectStatus, "Saved Shopify domain and token loaded from the local server.", "ok");
+                    }
+                } catch (error) {
+                    setStatus(connectStatus, "Saved Shopify credentials were not found on the local server.", "info");
                 }
             }
 
@@ -1788,12 +1809,14 @@
                 window.location.href = "/api/jobs/" + encodeURIComponent(currentJobId) + "/results.csv";
             });
 
-            loadStoredShopifyCredentials();
             renderConnection();
             updateFileMeta();
             refreshActionStates();
             refreshCustomerActionStates();
-            loadSavedImports();
+            loadStoredShopifyCredentials().then(function () {
+                refreshActionStates();
+                loadSavedImports();
+            });
         }());
     </script>
 </body>

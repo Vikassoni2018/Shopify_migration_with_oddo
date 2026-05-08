@@ -380,7 +380,7 @@ foreach ($order in $orders) {
 
     $additionalDetails = Get-AdditionalDetails -Order $order -ActualLineCount $actualLineCount -TargetLineCount $targetLineCount
     $lineDistributionNote = if ($targetLineCount -gt $actualLineCount) { "Assumed extra quantity on duplicated first line item" } else { "" }
-    $orderNote = "Imported from Odoo CSV for Matrixify. Historical line prices were distributed from the order total because the source file had no line-level prices."
+    $orderNote = "Imported from Odoo CSV. Historical line prices were distributed from the order total because the source file had no line-level prices."
 
     for ($index = 0; $index -lt $expandedLines.Count; $index++) {
         $line = $expandedLines[$index]

@@ -1,2 +1,5 @@
 jobs/
 import-plans/
+connection.json
+.env
+node_modules/

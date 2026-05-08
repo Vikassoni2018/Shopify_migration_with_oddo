@@ -5,15 +5,11 @@ services:
     repo: https://github.com/Vikassoni2018/Shopify_migration_with_oddo
     branch: backgroundjob
     autoDeployTrigger: commit
-    plan: starter
+    plan: free
     region: singapore
     buildCommand: npm install
     startCommand: npm start
     healthCheckPath: /healthz
-    disk:
-      name: import-data
-      mountPath: /var/data
-      sizeGB: 1
     envVars:
       - key: NODE_ENV
         value: production
@@ -22,7 +18,7 @@ services:
       - key: HOST
         value: 0.0.0.0
       - key: DATA_DIR
-        value: /var/data
+        value: .
       - key: AUTO_IMPORT_ALL_BATCHES
         value: "true"
       - key: ORDER_CREATE_SPACING_MS

@@ -947,10 +947,11 @@
                 var hasConnectionInput = connectedShop || (shopDomainInput.value.trim() && accessTokenInput.value.trim());
                 var canImport = (hasPreparedUpload || hasSavedPlan) && hasConnectionInput;
                 var hasMultipleBatches = importBatches.length > 1;
+                var hasMatrixifyDownload = previewResult && !previewResult.lightweight;
 
                 previewButton.disabled = !selectedFile;
-                downloadOrdersButton.disabled = !previewResult;
-                downloadMappingButton.disabled = !previewResult;
+                downloadOrdersButton.disabled = !hasMatrixifyDownload;
+                downloadMappingButton.disabled = !hasMatrixifyDownload;
                 importButton.textContent = hasMultipleBatches ? "Import All Batches" : "Import to Shopify";
                 importButton.disabled = importInProgress || !canImport;
                 Array.from(batchBody.querySelectorAll("[data-batch-index]")).forEach(function (button) {
@@ -1018,6 +1019,10 @@
                 var references = [];
                 var seen = Object.create(null);
 
+                if (previewResult && Array.isArray(previewResult.orderReferences)) {
+                    return previewResult.orderReferences.slice();
+                }
+
                 if (!previewResult || !previewResult.matrixifyRows) {
                     return references;
                 }
@@ -1033,6 +1038,48 @@
                 });
 
                 return references;
+            }
+
+            function getCsvOrderReference(row) {
+                return String(row && (
+                    row["Order Reference"] ||
+                    row["Odoo Order Reference"] ||
+                    row.Name ||
+                    row["Source Identifier"] ||
+                    ""
+                )).trim();
+            }
+
+            function scanCsvForImportPlan(csvText) {
+                var document = converter.parseCsvDocument(csvText);
+                var references = [];
+                var seen = Object.create(null);
+
+                document.rows.forEach(function (row) {
+                    var reference = getCsvOrderReference(row);
+                    if (!reference || seen[reference]) {
+                        return;
+                    }
+
+                    seen[reference] = true;
+                    references.push(reference);
+                });
+
+                return {
+                    lightweight: true,
+                    matrixifyRows: null,
+                    matrixifyCsvText: "",
+                    mappingCsvText: "",
+                    ordersFileName: "Orders.csv",
+                    mappingFileName: "odoo_to_matrixify_column_mapping.csv",
+                    orderReferences: references,
+                    stats: {
+                        sourceColumns: document.headers.length,
+                        sourceRowsRead: document.rows.length,
+                        sourceOrdersParsed: references.length,
+                        matrixifyRowsWritten: 0
+                    }
+                };
             }
 
             function buildImportBatches() {
@@ -1523,20 +1570,17 @@
 
                 try {
                     var csvText = await selectedFile.text();
-                    previewResult = converter.convertCsvText(csvText, {
-                        ordersFileName: "Orders.csv",
-                        mappingFileName: "odoo_to_matrixify_column_mapping.csv"
-                    });
+                    previewResult = scanCsvForImportPlan(csvText);
                     renderPreview();
                     try {
                         await saveImportPlanToServer(csvText);
                     } catch (planError) {
-                        setStatus(fileStatus, "Preview is ready, but the CSV was not saved to Render disk: " + planError.message, "error");
+                        setStatus(fileStatus, "Import plan is ready, but the CSV was not saved to Render disk: " + planError.message, "error");
                         refreshActionStates();
                         return;
                     }
                     refreshActionStates();
-                    setStatus(fileStatus, "Preview is ready and saved on Render disk. Orders are split into " + importBatches.length + " import batch(es).", "ok");
+                    setStatus(fileStatus, "Import plan is ready and saved on Render disk. Orders are split into " + importBatches.length + " import batch(es).", "ok");
                 } catch (error) {
                     previewResult = null;
                     importPlanId = "";
@@ -1772,14 +1816,14 @@
             });
 
             downloadOrdersButton.addEventListener("click", function () {
-                if (!previewResult) {
+                if (!previewResult || previewResult.lightweight) {
                     return;
                 }
                 downloadText(previewResult.ordersFileName, previewResult.matrixifyCsvText);
             });
 
             downloadMappingButton.addEventListener("click", function () {
-                if (!previewResult) {
+                if (!previewResult || previewResult.lightweight) {
                     return;
                 }
                 downloadText(previewResult.mappingFileName, previewResult.mappingCsvText);

@@ -724,6 +724,7 @@ function buildStatsFromCsvText(csvText) {
     let headers = [];
     let sourceRowsRead = 0;
     let referenceIndex = -1;
+    const orderReferences = [];
     const seenReferences = new Set();
 
     forEachCsvRecord(csvText, (record) => {
@@ -741,15 +742,21 @@ function buildStatsFromCsvText(csvText) {
         sourceRowsRead += 1;
         const reference = referenceIndex >= 0 ? String(record[referenceIndex] || "").trim() : "";
         if (reference) {
-            seenReferences.add(reference);
+            if (!seenReferences.has(reference)) {
+                seenReferences.add(reference);
+                orderReferences.push(reference);
+            }
         }
     });
 
     return {
-        sourceColumns: headers.length,
-        sourceRowsRead,
-        sourceOrdersParsed: seenReferences.size,
-        matrixifyRowsWritten: 0
+        stats: {
+            sourceColumns: headers.length,
+            sourceRowsRead,
+            sourceOrdersParsed: seenReferences.size,
+            matrixifyRowsWritten: 0
+        },
+        orderReferences
     };
 }
 
@@ -969,9 +976,9 @@ function createImportPlan(payload) {
     let stats = payload.stats && typeof payload.stats === "object" ? payload.stats : null;
 
     if (!orderReferences.length || !stats) {
-        const importBuild = buildApiImportOrders(csvText, payload.timeZoneOffset);
-        orderReferences = getUniqueOrderReferences(importBuild.apiOrders);
-        stats = importBuild.converted.stats;
+        const scan = buildStatsFromCsvText(csvText);
+        orderReferences = orderReferences.length ? orderReferences : scan.orderReferences;
+        stats = stats || scan.stats;
     }
 
     if (!orderReferences.length) {
@@ -2396,9 +2403,12 @@ async function handleApiRequest(request, response) {
             }
 
             const requestedReferences = getRequestedOrderReferences(payload);
+            const scan = payload.stats && typeof payload.stats === "object"
+                ? null
+                : buildStatsFromCsvText(payload.csvText);
             const stats = payload.stats && typeof payload.stats === "object"
                 ? payload.stats
-                : buildStatsFromCsvText(payload.csvText);
+                : scan.stats;
 
             const job = createJob(stats, {
                 persisted: true,
@@ -2408,7 +2418,7 @@ async function handleApiRequest(request, response) {
                 orderReferences: requestedReferences,
                 timeZoneOffset: payload.timeZoneOffset || ""
             });
-            job.summary.totalOrders = requestedReferences.length || Number(stats.sourceOrdersParsed || 0);
+            job.summary.totalOrders = requestedReferences.length || Number(stats.sourceOrdersParsed || (scan && scan.orderReferences.length) || 0);
             saveJobCsv(job, payload.csvText);
             startJobInBackground(job, {
                 ...payload,

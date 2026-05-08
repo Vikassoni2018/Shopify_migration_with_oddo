@@ -1239,7 +1239,17 @@
                     applyImportPlan(response.plan);
                     setStatus(fileStatus, "Saved CSV opened from Render disk. Choose a pending batch to import or resume.", "ok");
                 } catch (error) {
-                    setStatus(savedImportsStatus, error.message, "error");
+                    if (String(error.message || "").indexOf("Saved import plan not found") !== -1) {
+                        activeImportPlan = null;
+                        importPlanId = "";
+                        importBatches = [];
+                        activeBatchIndex = -1;
+                        renderBatchList();
+                        await loadSavedImports();
+                        setStatus(savedImportsStatus, "That saved import no longer exists on Render disk. Upload and prepare the CSV again to create a new saved import.", "error");
+                    } else {
+                        setStatus(savedImportsStatus, error.message, "error");
+                    }
                 }
             }
 

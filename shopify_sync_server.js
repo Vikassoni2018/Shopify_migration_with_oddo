@@ -613,6 +613,55 @@ function getUniqueOrderReferences(apiOrders) {
     return references;
 }
 
+function getRowOrderReference(row) {
+    return String(row && (
+        row["Order Reference"]
+        || row["Odoo Order Reference"]
+        || row.Name
+        || row["Source Identifier"]
+        || ""
+    )).trim();
+}
+
+function buildCsvForOrderReferences(csvText, orderReferences) {
+    const requestedReferences = Array.isArray(orderReferences)
+        ? orderReferences.map((reference) => String(reference || "").trim()).filter(Boolean)
+        : [];
+
+    if (!requestedReferences.length) {
+        return String(csvText || "");
+    }
+
+    const requestedSet = new Set(requestedReferences);
+    const document = converter.parseCsvDocument(String(csvText || ""));
+    const rows = document.rows.filter((row) => requestedSet.has(getRowOrderReference(row)));
+
+    if (!rows.length) {
+        throw new Error("The selected batch did not match any orders in the saved CSV.");
+    }
+
+    return converter.toCsv(rows, document.headers);
+}
+
+function buildStatsFromCsvText(csvText) {
+    const document = converter.parseCsvDocument(String(csvText || ""));
+    const seenReferences = new Set();
+
+    document.rows.forEach((row) => {
+        const reference = getRowOrderReference(row);
+        if (reference) {
+            seenReferences.add(reference);
+        }
+    });
+
+    return {
+        sourceColumns: document.headers.length,
+        sourceRowsRead: document.rows.length,
+        sourceOrdersParsed: seenReferences.size,
+        matrixifyRowsWritten: 0
+    };
+}
+
 function createImportPlanBatches(orderReferences) {
     const batches = [];
 
@@ -832,6 +881,10 @@ function createImportPlan(payload) {
         const importBuild = buildApiImportOrders(csvText, payload.timeZoneOffset);
         orderReferences = getUniqueOrderReferences(importBuild.apiOrders);
         stats = importBuild.converted.stats;
+    }
+
+    if (!orderReferences.length) {
+        throw new Error("No Odoo orders were found in the uploaded CSV.");
     }
 
     const planId = crypto.randomUUID();
@@ -1698,12 +1751,17 @@ async function runImportJob(job, payload) {
     syncImportPlanBatchFromJob(job);
 
     try {
-        const csvText = runtimePayload.csvText !== undefined
+        let sourceCsvText = runtimePayload.csvText !== undefined
             ? String(runtimePayload.csvText || "")
             : getJobCsvText(job);
         const requestedReferences = getRequestedOrderReferences(runtimePayload).length
             ? getRequestedOrderReferences(runtimePayload)
             : job.orderReferences;
+        const uploadedCsvBytes = Buffer.byteLength(sourceCsvText, "utf8");
+        const csvText = requestedReferences.length
+            ? buildCsvForOrderReferences(sourceCsvText, requestedReferences)
+            : sourceCsvText;
+        sourceCsvText = "";
         const effectivePayload = {
             ...runtimePayload,
             csvText,
@@ -1722,7 +1780,9 @@ async function runImportJob(job, payload) {
         writeImportLog("import_job_started", {
             jobId: job.id,
             shopDomain: normalizeShopDomain(effectivePayload.shopDomain),
-            uploadedCsvBytes: Buffer.byteLength(csvText, "utf8"),
+            uploadedCsvBytes,
+            workingCsvBytes: Buffer.byteLength(csvText, "utf8"),
+            requestedOrders: requestedReferences.length,
             batchLabel: job.batchLabel || ""
         });
 
@@ -1912,13 +1972,15 @@ function getJobPayload(job) {
 
 function startJobInBackground(job, payload) {
     jobs.set(job.id, job);
-    runImportJob(job, payload).catch((error) => {
-        job.runtimeActive = false;
-        job.status = "failed";
-        job.error = error.message;
-        job.updatedAt = new Date().toISOString();
-        savePersistedJob(job);
-        syncImportPlanBatchFromJob(job);
+    setImmediate(() => {
+        runImportJob(job, payload).catch((error) => {
+            job.runtimeActive = false;
+            job.status = "failed";
+            job.error = error.message;
+            job.updatedAt = new Date().toISOString();
+            savePersistedJob(job);
+            syncImportPlanBatchFromJob(job);
+        });
     });
 }
 
@@ -1967,7 +2029,6 @@ function startImportPlanBatch(plan, batch, payload) {
 
     startJobInBackground(job, {
         ...payload,
-        csvText: getImportPlanCsvText(plan),
         orderReferences: batch.orderReferences,
         batchLabel: `Batch ${batch.number}`,
         timeZoneOffset: payload.timeZoneOffset || plan.timeZoneOffset
@@ -2134,7 +2195,6 @@ async function handleApiRequest(request, response) {
                 if (!job.runtimeActive && job.status !== "completed") {
                     startJobInBackground(job, {
                         ...payload,
-                        csvText: getJobCsvText(job),
                         shopDomain: payload.shopDomain || job.shopDomain,
                         orderReferences: job.orderReferences,
                         batchLabel: job.batchLabel,
@@ -2163,23 +2223,26 @@ async function handleApiRequest(request, response) {
                 throw new Error("Upload an Odoo CSV before starting the import.");
             }
 
-            const preview = buildApiImportOrders(payload.csvText, payload.timeZoneOffset);
-            const apiOrders = filterApiOrdersForPayload(preview.apiOrders, payload);
-            if (getRequestedOrderReferences(payload).length && !apiOrders.length) {
-                throw new Error("The selected batch did not match any orders in the uploaded CSV.");
-            }
+            const requestedReferences = getRequestedOrderReferences(payload);
+            const stats = payload.stats && typeof payload.stats === "object"
+                ? payload.stats
+                : buildStatsFromCsvText(payload.csvText);
 
-            const job = createJob(preview.converted.stats, {
+            const job = createJob(stats, {
                 persisted: true,
                 sourceFileName: payload.sourceFileName || "",
                 shopDomain: payload.shopDomain,
                 batchLabel: payload.batchLabel || "",
-                orderReferences: getRequestedOrderReferences(payload),
+                orderReferences: requestedReferences,
                 timeZoneOffset: payload.timeZoneOffset || ""
             });
-            job.summary.totalOrders = apiOrders.length;
+            job.summary.totalOrders = requestedReferences.length || Number(stats.sourceOrdersParsed || 0);
             saveJobCsv(job, payload.csvText);
-            startJobInBackground(job, payload);
+            startJobInBackground(job, {
+                ...payload,
+                csvText: undefined,
+                orderReferences: requestedReferences
+            });
 
             sendJson(response, 202, {
                 ok: true,

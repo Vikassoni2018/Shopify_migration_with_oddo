@@ -17,6 +17,8 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
+      - key: NODE_VERSION
+        value: "22"
       - key: HOST
         value: 0.0.0.0
       - key: DATA_DIR
@@ -30,4 +32,10 @@ services:
       - key: SHOPIFY_SHOP_DOMAIN
         sync: false
       - key: SHOPIFY_ACCESS_TOKEN
+        sync: false
+      - key: SMTP_URL
+        sync: false
+      - key: ALERT_EMAIL_TO
+        value: vikassoni2018@gmail.com
+      - key: APP_URL
         sync: false

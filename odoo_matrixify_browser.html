@@ -585,7 +585,7 @@
                 <div class="preview-top">
                     <div>
                         <h3>Batch import list</h3>
-                        <p>Each row imports only that batch of order references through the normal Shopify import flow.</p>
+                        <p>Render processes one batch at a time and automatically starts the next batch until the saved import is complete.</p>
                     </div>
                 </div>
                 <div class="status" id="batchStatus"></div>
@@ -951,8 +951,8 @@
                 previewButton.disabled = !selectedFile;
                 downloadOrdersButton.disabled = !previewResult;
                 downloadMappingButton.disabled = !previewResult;
-                importButton.textContent = hasMultipleBatches ? "Use Batch List Below" : "Import to Shopify";
-                importButton.disabled = importInProgress || !canImport || hasMultipleBatches;
+                importButton.textContent = hasMultipleBatches ? "Import All Batches" : "Import to Shopify";
+                importButton.disabled = importInProgress || !canImport;
                 Array.from(batchBody.querySelectorAll("[data-batch-index]")).forEach(function (button) {
                     var batch = importBatches[Number(button.getAttribute("data-batch-index"))];
                     button.disabled = importInProgress || !canImport || !batch;
@@ -1158,6 +1158,22 @@
 
                 importBatches = buildImportBatches();
                 renderBatchList();
+            }
+
+            function isBatchDone(batch) {
+                return batch && (batch.status === "completed" || batch.status === "completed_with_failures");
+            }
+
+            function findFirstRunnableBatchIndex() {
+                var index;
+
+                for (index = 0; index < importBatches.length; index += 1) {
+                    if (!isBatchDone(importBatches[index])) {
+                        return index;
+                    }
+                }
+
+                return -1;
             }
 
             function renderSavedImports() {
@@ -1539,12 +1555,23 @@
                     return;
                 }
 
-                var batch = Number.isInteger(batchIndex) ? importBatches[batchIndex] : null;
                 var effectiveBatchIndex = Number.isInteger(batchIndex) ? batchIndex : -1;
+                var batch;
+
+                if (effectiveBatchIndex < 0 && importPlanId && importBatches.length > 1) {
+                    effectiveBatchIndex = findFirstRunnableBatchIndex();
+                }
+
+                batch = effectiveBatchIndex >= 0 ? importBatches[effectiveBatchIndex] : null;
 
                 if (!batch && importPlanId && importBatches.length === 1) {
                     batch = importBatches[0];
                     effectiveBatchIndex = 0;
+                }
+
+                if (importPlanId && importBatches.length && !batch) {
+                    setStatus(jobStatus, "All batches are already completed.", "ok");
+                    return;
                 }
 
                 importButton.disabled = true;
@@ -1557,7 +1584,7 @@
                     renderBatchList();
                 }
 
-                setStatus(jobStatus, batch ? "Starting Shopify import job for batch " + batch.number + "..." : "Starting Shopify import job...", "info");
+                setStatus(jobStatus, batch ? "Starting Shopify import job for batch " + batch.number + ". Remaining batches will continue automatically on Render..." : "Starting Shopify import job...", "info");
 
                 try {
                     saveStoredShopifyCredentials();

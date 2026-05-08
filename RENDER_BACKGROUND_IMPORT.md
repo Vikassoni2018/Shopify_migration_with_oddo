@@ -36,7 +36,7 @@ This is file-backed persistence, not a database queue. It is enough for one Rend
 3. Upload the Odoo order CSV.
 4. Click `Preview and Prepare`.
 5. The CSV is saved on Render disk and shown in `Saved Render imports`.
-6. Use the 1,000-order batch list to import one batch at a time.
+6. Click `Import All Batches` or start the first batch. Render imports one 1,000-order batch at a time and automatically starts the next batch after each batch completes.
 7. If the browser closes or the service restarts, reopen the app and click `Open Batches` for the saved CSV.
 
 The current safe pacing estimate is about 3h 36m per 1,000 orders.

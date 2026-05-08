@@ -15,6 +15,7 @@ const IMPORT_PLANS_DIR = path.join(DATA_DIR, "import-plans");
 const IMPORT_LOG_PATH = path.join(LOG_DIR, "shopify_import_debug.log");
 const CONNECTION_PATH = path.join(DATA_DIR, "connection.json");
 const IMPORT_BATCH_SIZE = Number(process.env.IMPORT_BATCH_SIZE || 1000);
+const AUTO_IMPORT_ALL_BATCHES = String(process.env.AUTO_IMPORT_ALL_BATCHES || "true").toLowerCase() !== "false";
 const ORDER_CREATE_SPACING_MS = Number(process.env.ORDER_CREATE_SPACING_MS || 5000);
 const SHOPIFY_THROTTLE_RETRY_WAIT_MS = Number(process.env.SHOPIFY_THROTTLE_RETRY_WAIT_MS || 65000);
 const SHOPIFY_THROTTLE_MAX_ATTEMPTS = Number(process.env.SHOPIFY_THROTTLE_MAX_ATTEMPTS || 8);
@@ -1930,6 +1931,7 @@ async function runImportJob(job, payload) {
             shopDomain: connection.shopDomain,
             summary: job.summary
         });
+        startNextImportPlanBatchFromJob(job);
     } catch (error) {
         job.status = "failed";
         job.runtimeActive = false;
@@ -1982,6 +1984,86 @@ function startJobInBackground(job, payload) {
             syncImportPlanBatchFromJob(job);
         });
     });
+}
+
+function isBatchTerminal(batch) {
+    return batch && (
+        batch.status === "completed"
+        || batch.status === "completed_with_failures"
+    );
+}
+
+function isBatchActive(batch) {
+    if (!batch) {
+        return false;
+    }
+
+    if (batch.status === "running" || batch.status === "queued") {
+        return true;
+    }
+
+    const job = batch.jobId ? getJobById(batch.jobId) : null;
+    return !!(job && job.runtimeActive && (job.status === "running" || job.status === "queued"));
+}
+
+function findNextImportPlanBatch(plan, completedBatchNumber) {
+    const currentNumber = Number(completedBatchNumber || 0);
+    const batches = Array.isArray(plan && plan.batches) ? plan.batches : [];
+
+    return batches.find((batch) => (
+        Number(batch.number || 0) > currentNumber
+        && !isBatchTerminal(batch)
+        && !isBatchActive(batch)
+    )) || null;
+}
+
+function startNextImportPlanBatchFromJob(job) {
+    if (!AUTO_IMPORT_ALL_BATCHES || !job || !job.importPlanId || !job.importPlanBatchNumber) {
+        return;
+    }
+
+    try {
+        const plan = loadImportPlan(job.importPlanId);
+        if (!plan || !Array.isArray(plan.batches)) {
+            return;
+        }
+
+        if (plan.batches.some(isBatchActive)) {
+            return;
+        }
+
+        const nextBatch = findNextImportPlanBatch(plan, job.importPlanBatchNumber);
+        if (!nextBatch) {
+            writeImportLog("auto_import_all_batches_completed", {
+                importPlanId: plan.id,
+                afterBatch: job.importPlanBatchNumber
+            });
+            return;
+        }
+
+        nextBatch.message = `Auto queued after Batch ${job.importPlanBatchNumber}`;
+        plan.updatedAt = new Date().toISOString();
+        saveImportPlan(plan);
+
+        const nextJob = startImportPlanBatch(plan, nextBatch, {
+            shopDomain: job.shopDomain,
+            timeZoneOffset: job.timeZoneOffset
+        });
+
+        writeImportLog("auto_import_next_batch_started", {
+            importPlanId: plan.id,
+            previousJobId: job.id,
+            nextJobId: nextJob.id,
+            nextBatchNumber: nextBatch.number
+        });
+    } catch (error) {
+        writeImportLog("auto_import_next_batch_failed", {
+            jobId: job.id,
+            importPlanId: job.importPlanId,
+            batchNumber: job.importPlanBatchNumber,
+            message: error.message
+        });
+    }
 }
 
 function startImportPlanBatch(plan, batch, payload) {

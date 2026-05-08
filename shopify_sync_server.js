@@ -14,7 +14,7 @@ const JOBS_DIR = path.join(DATA_DIR, "jobs");
 const IMPORT_PLANS_DIR = path.join(DATA_DIR, "import-plans");
 const IMPORT_LOG_PATH = path.join(LOG_DIR, "shopify_import_debug.log");
 const IMPORT_BATCH_SIZE = Number(process.env.IMPORT_BATCH_SIZE || 1000);
-const ORDER_CREATE_SPACING_MS = Number(process.env.ORDER_CREATE_SPACING_MS || 13000);
+const ORDER_CREATE_SPACING_MS = Number(process.env.ORDER_CREATE_SPACING_MS || 5000);
 const SHOPIFY_THROTTLE_RETRY_WAIT_MS = Number(process.env.SHOPIFY_THROTTLE_RETRY_WAIT_MS || 65000);
 const SHOPIFY_THROTTLE_MAX_ATTEMPTS = Number(process.env.SHOPIFY_THROTTLE_MAX_ATTEMPTS || 8);
 const jobs = new Map();
@@ -338,6 +338,31 @@ function getImportPlanCsvPath(planId) {
     return path.join(getImportPlanDirectory(planId), "source.csv");
 }
 
+function hasActiveRuntimeJobs() {
+    return Array.from(jobs.values()).some((job) => (
+        job
+        && job.runtimeActive
+        && (job.status === "running" || job.status === "queued")
+    ));
+}
+
+function clearPersistedImportData() {
+    if (hasActiveRuntimeJobs()) {
+        throw new Error("An import job is still running. Wait for it to finish before clearing saved jobs.");
+    }
+
+    fs.rmSync(JOBS_DIR, { recursive: true, force: true });
+    fs.rmSync(IMPORT_PLANS_DIR, { recursive: true, force: true });
+    ensureDirectory(JOBS_DIR);
+    ensureDirectory(IMPORT_PLANS_DIR);
+    jobs.clear();
+
+    writeImportLog("persisted_import_data_cleared", {
+        jobsDir: JOBS_DIR,
+        importPlansDir: IMPORT_PLANS_DIR
+    });
+}
+
 function getDefaultSummary(totalOrders) {
     return {
         totalOrders: Number(totalOrders || 0),
@@ -445,9 +470,11 @@ function loadPersistedJob(jobId) {
     }
 
     const saved = JSON.parse(fs.readFileSync(statePath, "utf8"));
+    const savedStatus = saved.status || "queued";
+    const wasInterrupted = savedStatus === "running" || savedStatus === "queued";
     const job = {
         id: safeId,
-        status: saved.status || "queued",
+        status: wasInterrupted ? "queued" : savedStatus,
         createdAt: saved.createdAt || new Date().toISOString(),
         updatedAt: saved.updatedAt || new Date().toISOString(),
         startedAt: saved.startedAt || "",
@@ -455,7 +482,7 @@ function loadPersistedJob(jobId) {
         stats: saved.stats || {},
         summary: saved.summary || getDefaultSummary(),
         warnings: Array.isArray(saved.warnings) ? saved.warnings : [],
-        statusMessage: saved.statusMessage || "",
+        statusMessage: wasInterrupted ? "Previous run was interrupted. Click Resume Batch to continue from the next unprocessed order." : saved.statusMessage || "",
         error: saved.error || "",
         results: Array.isArray(saved.results) ? saved.results : [],
         recentResults: [],
@@ -471,6 +498,10 @@ function loadPersistedJob(jobId) {
     };
 
     recalculateJobSummary(job);
+    if (wasInterrupted) {
+        savePersistedJob(job);
+        syncImportPlanBatchFromJob(job);
+    }
     jobs.set(job.id, job);
     return job;
 }
@@ -589,6 +620,45 @@ function getImportPlanSummary(plan) {
     return summary;
 }
 
+function reconcileImportPlanBatches(plan) {
+    if (!plan || !Array.isArray(plan.batches)) {
+        return plan;
+    }
+
+    let changed = false;
+    plan.batches.forEach((batch) => {
+        if (!batch || !batch.jobId) {
+            return;
+        }
+
+        const job = getJobById(batch.jobId);
+        if (!job) {
+            return;
+        }
+
+        batch.status = job.status || batch.status;
+        batch.summary = job.summary || batch.summary;
+        batch.updatedAt = job.updatedAt || batch.updatedAt;
+        if (job.statusMessage) {
+            batch.message = job.statusMessage;
+        } else if (job.status === "queued") {
+            batch.message = "Ready to resume";
+        } else if (job.status === "completed") {
+            batch.message = `Created ${job.summary.createdOrders}, updated ${job.summary.updatedOrders}, failed ${job.summary.failedOrders}`;
+        } else if (job.status === "failed") {
+            batch.message = job.error || "Import failed.";
+        }
+        changed = true;
+    });
+
+    if (changed) {
+        plan.updatedAt = new Date().toISOString();
+        saveImportPlan(plan);
+    }
+
+    return plan;
+}
+
 function getImportPlanSnapshot(plan) {
     return {
         id: plan.id,
@@ -672,6 +742,7 @@ function listImportPlans() {
 }
 
 function getImportPlanPayload(plan) {
+    reconcileImportPlanBatches(plan);
     return {
         ...getImportPlanSnapshot(plan),
         summary: getImportPlanSummary(plan)
@@ -1040,6 +1111,64 @@ function mapFulfillmentStatus(orderStatus, shippingStatus) {
     return null;
 }
 
+function splitCustomerName(name) {
+    const parts = String(name || "").trim().split(/\s+/).filter(Boolean);
+    if (!parts.length) {
+        return {
+            firstName: "",
+            lastName: ""
+        };
+    }
+
+    if (parts.length === 1) {
+        return {
+            firstName: parts[0],
+            lastName: ""
+        };
+    }
+
+    return {
+        firstName: parts.slice(0, -1).join(" "),
+        lastName: parts[parts.length - 1]
+    };
+}
+
+function limitShopifyAddressField(value) {
+    const text = String(value || "").trim();
+    return text.length > 255 ? text.slice(0, 255) : text;
+}
+
+function buildShippingAddress(firstRow) {
+    const rawAddress = String(
+        firstRow["Odoo Customer/Contact Address Complete"]
+        || firstRow["Odoo Shipping Address"]
+        || firstRow["Odoo Delivery Address"]
+        || ""
+    ).trim();
+    if (!rawAddress) {
+        return null;
+    }
+
+    const customerName = splitCustomerName(firstRow["Odoo Customer"]);
+    const address = {
+        address1: limitShopifyAddressField(rawAddress)
+    };
+
+    if (customerName.firstName) {
+        address.firstName = customerName.firstName;
+    }
+
+    if (customerName.lastName) {
+        address.lastName = customerName.lastName;
+    }
+
+    if (firstRow.Phone) {
+        address.phone = String(firstRow.Phone).trim();
+    }
+
+    return address;
+}
+
 function toShopifyDateTime(value, timeZoneOffset) {
     const input = String(value || "").trim();
     if (!input) {
@@ -1099,6 +1228,33 @@ function mergeNotes(existingNote, incomingNote) {
     return `${current}\n\n${next}`;
 }
 
+function isShippingAddressUserError(userError) {
+    const field = Array.isArray(userError && userError.field) ? userError.field : [];
+    return field[0] === "shippingAddress";
+}
+
+async function sendOrderUpdate(shopDomain, accessToken, input, context) {
+    const data = await shopifyGraphql(shopDomain, accessToken, UPDATE_ORDER_MUTATION, { input }, {
+        action: "UPDATE_ORDER",
+        ...(context || {})
+    });
+    const payload = data.orderUpdate;
+
+    if (payload.userErrors && payload.userErrors.length) {
+        writeImportLog("shopify_order_update_user_errors", {
+            shopDomain,
+            action: "UPDATE_ORDER",
+            ...(context || {}),
+            userErrors: payload.userErrors
+        });
+        throw createShopifyRequestError(payload.userErrors.map((item) => item.message).join("; "), {
+            shopifyUserErrors: payload.userErrors
+        });
+    }
+
+    return payload.order;
+}
+
 function groupRowsByName(matrixifyRows) {
     const grouped = new Map();
 
@@ -1134,6 +1290,7 @@ function buildApiImportOrders(csvText, timeZoneOffset) {
         const financialStatus = mapPaymentStatus(firstRow["Payment: Status"]);
         const fulfillmentStatus = mapFulfillmentStatus(firstRow["Odoo Order Status"], firstRow["Odoo Shipping Status"]);
         const processedAt = toShopifyDateTime(firstRow["Processed At"], timeZoneOffset);
+        const shippingAddress = buildShippingAddress(firstRow);
 
         const lineItems = rows.map((row) => {
             const lineProperties = parseEscapedKeyValueLines(row["Line: Properties"]);
@@ -1142,7 +1299,7 @@ function buildApiImportOrders(csvText, timeZoneOffset) {
             const lineItem = {
                 title: String(row["Line: Title"] || "Imported Odoo Order").trim() || "Imported Odoo Order",
                 quantity: Number.parseInt(String(row["Line: Quantity"] || "1"), 10) || 1,
-                requiresShipping: false,
+                requiresShipping: !!shippingAddress,
                 priceSet: {
                     shopMoney: {
                         amount: String(row["Line: Price"] || "0.00"),
@@ -1178,6 +1335,10 @@ function buildApiImportOrders(csvText, timeZoneOffset) {
 
         if (firstRow.Phone) {
             orderInput.phone = String(firstRow.Phone).trim();
+        }
+
+        if (shippingAddress) {
+            orderInput.shippingAddress = shippingAddress;
         }
 
         if (processedAt) {
@@ -1326,14 +1487,38 @@ async function connectShop(payload, context) {
 }
 
 async function findExistingOrder(shopDomain, accessToken, orderReference, context) {
-    const query = `"${String(orderReference || "").replace(/\\/g, "\\\\").replace(/"/g, "\\\"")}"`;
-    const data = await shopifyGraphql(shopDomain, accessToken, FIND_ORDERS_QUERY, { query }, {
-        action: "FIND_EXISTING_ORDER",
-        orderReference,
-        ...(context || {})
-    });
-    const nodes = data && data.orders && Array.isArray(data.orders.nodes) ? data.orders.nodes : [];
-    return nodes.find((node) => node.name === orderReference || node.sourceIdentifier === orderReference) || null;
+    const reference = String(orderReference || "").trim();
+    const escapedReference = reference.replace(/\\/g, "\\\\").replace(/"/g, "\\\"");
+    const searchQueries = [
+        `name:${escapedReference}`,
+        `source_identifier:${escapedReference}`,
+        `"${escapedReference}"`
+    ];
+    const seenOrderIds = new Set();
+
+    for (const query of searchQueries) {
+        const data = await shopifyGraphql(shopDomain, accessToken, FIND_ORDERS_QUERY, { query }, {
+            action: "FIND_EXISTING_ORDER",
+            orderReference: reference,
+            searchQuery: query,
+            ...(context || {})
+        });
+        const nodes = data && data.orders && Array.isArray(data.orders.nodes) ? data.orders.nodes : [];
+        const exactMatch = nodes.find((node) => {
+            if (!node || seenOrderIds.has(node.id)) {
+                return false;
+            }
+
+            seenOrderIds.add(node.id);
+            return node.name === reference || node.name === `#${reference}` || node.sourceIdentifier === reference;
+        });
+
+        if (exactMatch) {
+            return exactMatch;
+        }
+    }
+
+    return null;
 }
 
 async function createOrder(shopDomain, accessToken, orderInput, context) {
@@ -1381,28 +1566,38 @@ async function updateOrder(shopDomain, accessToken, existingOrder, orderInput, c
         input.phone = orderInput.phone;
     }
 
+    if (orderInput.shippingAddress) {
+        input.shippingAddress = orderInput.shippingAddress;
+    }
+
     if (mergedAttributes.length) {
         input.customAttributes = mergedAttributes;
     }
 
-    const data = await shopifyGraphql(shopDomain, accessToken, UPDATE_ORDER_MUTATION, { input }, {
-        action: "UPDATE_ORDER",
-        ...(context || {})
-    });
-    const payload = data.orderUpdate;
-    if (payload.userErrors && payload.userErrors.length) {
-        writeImportLog("shopify_order_update_user_errors", {
+    try {
+        return await sendOrderUpdate(shopDomain, accessToken, input, context);
+    } catch (error) {
+        const userErrors = Array.isArray(error.shopifyUserErrors) ? error.shopifyUserErrors : [];
+        const onlyShippingAddressErrors = userErrors.length > 0 && userErrors.every(isShippingAddressUserError);
+
+        if (!input.shippingAddress || !onlyShippingAddressErrors) {
+            throw error;
+        }
+
+        const fallbackInput = { ...input };
+        delete fallbackInput.shippingAddress;
+        writeImportLog("shopify_order_update_retry_without_shipping_address", {
             shopDomain,
             action: "UPDATE_ORDER",
             ...(context || {}),
-            userErrors: payload.userErrors
+            message: error.message
         });
-        throw createShopifyRequestError(payload.userErrors.map((item) => item.message).join("; "), {
-            shopifyUserErrors: payload.userErrors
+
+        return sendOrderUpdate(shopDomain, accessToken, fallbackInput, {
+            ...(context || {}),
+            skippedShippingAddress: true
         });
     }
-
-    return payload.order;
 }
 
 async function runImportJob(job, payload) {
@@ -1471,7 +1666,7 @@ async function runImportJob(job, payload) {
         });
 
         job.warnings = [
-            "Existing Shopify orders are updated only with note, phone, and custom attributes. Shopify line items and processed date are not rewritten for existing orders.",
+            "Existing Shopify orders are updated with note, phone, delivery address, and custom attributes. Shopify line items and processed date are not rewritten for existing orders.",
             "Shopify limits how quickly orders can be created. The importer now waits and retries instead of failing the remaining orders immediately.",
             "This job is saved on Render disk. If the service restarts, use the saved import list to resume from the next unprocessed order."
         ];
@@ -1517,7 +1712,7 @@ async function runImportJob(job, payload) {
                         status: "updated",
                         shopifyOrderId: updatedOrder.id,
                         shopifyOrderName: updatedOrder.name,
-                        message: "Updated note, phone, and custom attributes on the existing Shopify order."
+                        message: "Updated note, phone, delivery address, and custom attributes on the existing Shopify order."
                     });
                     writeImportLog("import_order_completed", {
                         jobId: job.id,
@@ -1723,6 +1918,21 @@ async function handleApiRequest(request, response) {
             ok: true,
             plans
         });
+        return;
+    }
+
+    if (request.method === "DELETE" && url.pathname === "/api/import-data") {
+        try {
+            clearPersistedImportData();
+            sendJson(response, 200, {
+                ok: true
+            });
+        } catch (error) {
+            sendJson(response, 400, {
+                ok: false,
+                error: error.message
+            });
+        }
         return;
     }
 

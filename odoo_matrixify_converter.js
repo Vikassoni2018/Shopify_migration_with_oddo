@@ -30,6 +30,7 @@
         "Odoo Total",
         "Odoo Currency",
         "Odoo Delivery Address",
+        "Odoo Customer/Contact Address Complete",
         "Odoo Cart Quantity",
         "Odoo Mobile",
         "Odoo Order Status",
@@ -45,6 +46,11 @@
         "Odoo Shipping Status",
         "Odoo Delivery Date",
         "Odoo Transactions",
+        "Odoo Marketplace",
+        "Odoo Marketplace Ref",
+        "Odoo Warehouse",
+        "Odoo Marketplace ID",
+        "Odoo Marketplace Channel",
         "Derived Line Price Allocation",
         "Derived Quantity Note",
         "Derived Phone Note"
@@ -87,6 +93,12 @@
             "Matrixify Column / Handling": "Additional Details, Odoo Delivery Address",
             "Action": "Copied to audit/detail",
             "Notes": "Not mapped to Shopify address fields because the export contains names, not structured addresses."
+        },
+        {
+            "Source Column": "Customer/Contact Address Complete",
+            "Matrixify Column / Handling": "Additional Details, Shopify shipping address, Odoo Customer/Contact Address Complete",
+            "Action": "Copied to order details and shipping address",
+            "Notes": "Used as the preferred complete delivery address when creating or updating Shopify orders."
         },
         {
             "Source Column": "Cart Quantity",
@@ -177,6 +189,36 @@
             "Matrixify Column / Handling": "Odoo Transactions",
             "Action": "Not imported",
             "Notes": "Source column is blank for all rows, so no transaction rows were created."
+        },
+        {
+            "Source Column": "Marketplace",
+            "Matrixify Column / Handling": "Additional Details, Odoo Marketplace",
+            "Action": "Copied to order details",
+            "Notes": "Preserved on the Shopify order as an additional detail/custom attribute."
+        },
+        {
+            "Source Column": "Marketplace Ref",
+            "Matrixify Column / Handling": "Additional Details, Odoo Marketplace Ref",
+            "Action": "Copied to order details",
+            "Notes": "Preserved on the Shopify order as the marketplace reference."
+        },
+        {
+            "Source Column": "Warehouse",
+            "Matrixify Column / Handling": "Additional Details, Odoo Warehouse",
+            "Action": "Copied to order details",
+            "Notes": "Preserved on the Shopify order for fulfillment/audit context."
+        },
+        {
+            "Source Column": "Marketplace Order ID",
+            "Matrixify Column / Handling": "Additional Details, Odoo Marketplace ID",
+            "Action": "Copied to order details",
+            "Notes": "Preserved on the Shopify order as the marketplace order ID."
+        },
+        {
+            "Source Column": "Marketplace Channel",
+            "Matrixify Column / Handling": "Additional Details, Odoo Marketplace Channel",
+            "Action": "Copied to order details",
+            "Notes": "Preserved on the Shopify order as the marketplace channel."
         }
     ];
 
@@ -482,6 +524,10 @@
             details.push(formatMatrixifyKeyValueLine("Odoo Delivery Address", order.deliveryAddress));
         }
 
+        if (order.customerContactAddressComplete) {
+            details.push(formatMatrixifyKeyValueLine("Odoo Customer/Contact Address Complete", order.customerContactAddressComplete));
+        }
+
         if (order.mobileRaw) {
             details.push(formatMatrixifyKeyValueLine("Odoo Mobile", order.mobileRaw));
         }
@@ -500,6 +546,26 @@
 
         if (order.orderDate) {
             details.push(formatMatrixifyKeyValueLine("Odoo Order Date", order.orderDate));
+        }
+
+        if (order.marketplace) {
+            details.push(formatMatrixifyKeyValueLine("Odoo Marketplace", order.marketplace));
+        }
+
+        if (order.marketplaceRef) {
+            details.push(formatMatrixifyKeyValueLine("Odoo Marketplace Ref", order.marketplaceRef));
+        }
+
+        if (order.warehouse) {
+            details.push(formatMatrixifyKeyValueLine("Odoo Warehouse", order.warehouse));
+        }
+
+        if (order.marketplaceId) {
+            details.push(formatMatrixifyKeyValueLine("Odoo Marketplace ID", order.marketplaceId));
+        }
+
+        if (order.marketplaceChannel) {
+            details.push(formatMatrixifyKeyValueLine("Odoo Marketplace Channel", order.marketplaceChannel));
         }
 
         details.push(formatMatrixifyKeyValueLine("Odoo Parsed Order Lines", actualLineCount));
@@ -1210,6 +1276,7 @@
                     total: parseDecimalOrNull(row["Total"]),
                     currency: getStringValue(row["Currency"]),
                     deliveryAddress: getStringValue(row["Delivery Address"]),
+                    customerContactAddressComplete: getStringValue(row["Customer/Contact Address Complete"]),
                     cartQuantityRaw: getStringValue(row["Cart Quantity"]),
                     cartQuantity: parseIntOrNull(row["Cart Quantity"]),
                     mobileRaw: getStringValue(row["Mobile"]),
@@ -1225,6 +1292,11 @@
                     shippingStatus: getStringValue(row["Shipping Status"]),
                     deliveryDate: getStringValue(row["Delivery Date"]),
                     transactions: getStringValue(row["Transactions"]),
+                    marketplace: getStringValue(row["Marketplace"]),
+                    marketplaceRef: getStringValue(row["Marketplace Ref"]),
+                    warehouse: getStringValue(row["Warehouse"]),
+                    marketplaceId: getStringValue(row["Marketplace Order ID"]) || getStringValue(row["Marketplace/ID"]),
+                    marketplaceChannel: getStringValue(row["Marketplace Channel"]),
                     sourceHeaderRow: row,
                     lineItems: []
                 };
@@ -1337,6 +1409,7 @@
                     "Odoo Total": order.totalRaw,
                     "Odoo Currency": order.currency,
                     "Odoo Delivery Address": order.deliveryAddress,
+                    "Odoo Customer/Contact Address Complete": order.customerContactAddressComplete,
                     "Odoo Cart Quantity": order.cartQuantityRaw,
                     "Odoo Mobile": order.mobileRaw,
                     "Odoo Order Status": order.orderStatus,
@@ -1352,6 +1425,11 @@
                     "Odoo Shipping Status": order.shippingStatus,
                     "Odoo Delivery Date": order.deliveryDate,
                     "Odoo Transactions": order.transactions,
+                    "Odoo Marketplace": order.marketplace,
+                    "Odoo Marketplace Ref": order.marketplaceRef,
+                    "Odoo Warehouse": order.warehouse,
+                    "Odoo Marketplace ID": order.marketplaceId,
+                    "Odoo Marketplace Channel": order.marketplaceChannel,
                     "Derived Line Price Allocation": "Distributed from order total across " + expandedLines.length + " unit rows",
                     "Derived Quantity Note": line.assumedExtraQuantity ? lineDistributionNote : "",
                     "Derived Phone Note": order.mobileRaw && !order.normalizedPhone ? "Source phone could not be normalized safely" : ""

@@ -21,6 +21,22 @@ function Get-StringValue {
     return ([string]$Value).Trim()
 }
 
+function Get-RowStringValue {
+    param(
+        [Parameter(Mandatory = $true)]
+        [object]$Row,
+        [Parameter(Mandatory = $true)]
+        [string]$Name
+    )
+
+    $property = $Row.PSObject.Properties[$Name]
+    if ($null -eq $property) {
+        return ""
+    }
+
+    return Get-StringValue $property.Value
+}
+
 function Parse-DecimalOrNull {
     param(
         [string]$Value
@@ -167,6 +183,10 @@ function Get-AdditionalDetails {
         $details.Add((Format-MatrixifyKeyValueLine -Key "Odoo Delivery Address" -Value $Order.DeliveryAddress))
     }
 
+    if ($Order.CustomerContactAddressComplete) {
+        $details.Add((Format-MatrixifyKeyValueLine -Key "Odoo Customer/Contact Address Complete" -Value $Order.CustomerContactAddressComplete))
+    }
+
     if ($Order.MobileRaw) {
         $details.Add((Format-MatrixifyKeyValueLine -Key "Odoo Mobile" -Value $Order.MobileRaw))
     }
@@ -185,6 +205,26 @@ function Get-AdditionalDetails {
 
     if ($Order.OrderDate) {
         $details.Add((Format-MatrixifyKeyValueLine -Key "Odoo Order Date" -Value $Order.OrderDate))
+    }
+
+    if ($Order.Marketplace) {
+        $details.Add((Format-MatrixifyKeyValueLine -Key "Odoo Marketplace" -Value $Order.Marketplace))
+    }
+
+    if ($Order.MarketplaceRef) {
+        $details.Add((Format-MatrixifyKeyValueLine -Key "Odoo Marketplace Ref" -Value $Order.MarketplaceRef))
+    }
+
+    if ($Order.Warehouse) {
+        $details.Add((Format-MatrixifyKeyValueLine -Key "Odoo Warehouse" -Value $Order.Warehouse))
+    }
+
+    if ($Order.MarketplaceId) {
+        $details.Add((Format-MatrixifyKeyValueLine -Key "Odoo Marketplace ID" -Value $Order.MarketplaceId))
+    }
+
+    if ($Order.MarketplaceChannel) {
+        $details.Add((Format-MatrixifyKeyValueLine -Key "Odoo Marketplace Channel" -Value $Order.MarketplaceChannel))
     }
 
     $details.Add((Format-MatrixifyKeyValueLine -Key "Odoo Parsed Order Lines" -Value $ActualLineCount))
@@ -239,6 +279,7 @@ foreach ($row in $sourceRows) {
             Total = Parse-DecimalOrNull $row.Total
             Currency = Get-StringValue $row.Currency
             DeliveryAddress = Get-StringValue $row."Delivery Address"
+            CustomerContactAddressComplete = Get-StringValue $row."Customer/Contact Address Complete"
             CartQuantityRaw = Get-StringValue $row."Cart Quantity"
             CartQuantity = Parse-IntOrNull $row."Cart Quantity"
             MobileRaw = Get-StringValue $row.Mobile
@@ -254,6 +295,11 @@ foreach ($row in $sourceRows) {
             ShippingStatus = Get-StringValue $row."Shipping Status"
             DeliveryDate = Get-StringValue $row."Delivery Date"
             Transactions = Get-StringValue $row.Transactions
+            Marketplace = Get-StringValue $row.Marketplace
+            MarketplaceRef = Get-StringValue $row."Marketplace Ref"
+            Warehouse = Get-StringValue $row.Warehouse
+            MarketplaceId = if (Get-RowStringValue -Row $row -Name "Marketplace Order ID") { Get-RowStringValue -Row $row -Name "Marketplace Order ID" } else { Get-RowStringValue -Row $row -Name "Marketplace/ID" }
+            MarketplaceChannel = Get-StringValue $row."Marketplace Channel"
             SourceHeaderRow = $row
             LineItems = New-Object System.Collections.Generic.List[object]
         }
@@ -378,6 +424,7 @@ foreach ($order in $orders) {
             "Odoo Total" = $order.TotalRaw
             "Odoo Currency" = $order.Currency
             "Odoo Delivery Address" = $order.DeliveryAddress
+            "Odoo Customer/Contact Address Complete" = $order.CustomerContactAddressComplete
             "Odoo Cart Quantity" = $order.CartQuantityRaw
             "Odoo Mobile" = $order.MobileRaw
             "Odoo Order Status" = $order.OrderStatus
@@ -393,6 +440,11 @@ foreach ($order in $orders) {
             "Odoo Shipping Status" = $order.ShippingStatus
             "Odoo Delivery Date" = $order.DeliveryDate
             "Odoo Transactions" = $order.Transactions
+            "Odoo Marketplace" = $order.Marketplace
+            "Odoo Marketplace Ref" = $order.MarketplaceRef
+            "Odoo Warehouse" = $order.Warehouse
+            "Odoo Marketplace ID" = $order.MarketplaceId
+            "Odoo Marketplace Channel" = $order.MarketplaceChannel
             "Derived Line Price Allocation" = "Distributed from order total across $($expandedLines.Count) unit rows"
             "Derived Quantity Note" = if ($line.AssumedExtraQuantity) { $lineDistributionNote } else { "" }
             "Derived Phone Note" = if ($order.MobileRaw -and -not $order.NormalizedPhone) { "Source phone could not be normalized safely" } else { "" }
@@ -406,6 +458,7 @@ $mappingRows = @(
     [pscustomobject]@{ "Source Column" = "Total"; "Matrixify Column / Handling" = "Line: Price (distributed), Odoo Total"; "Action" = "Derived"; "Notes" = "Source has no line prices, so order total was split across unit rows to preserve the order total exactly." }
     [pscustomobject]@{ "Source Column" = "Currency"; "Matrixify Column / Handling" = "Currency, Odoo Currency"; "Action" = "Renamed + Copied"; "Notes" = "Kept as the Shopify order currency." }
     [pscustomobject]@{ "Source Column" = "Delivery Address"; "Matrixify Column / Handling" = "Additional Details, Odoo Delivery Address"; "Action" = "Copied to audit/detail"; "Notes" = "Not mapped to Shopify address fields because the export contains names, not structured addresses." }
+    [pscustomobject]@{ "Source Column" = "Customer/Contact Address Complete"; "Matrixify Column / Handling" = "Additional Details, Shopify shipping address, Odoo Customer/Contact Address Complete"; "Action" = "Copied to order details and shipping address"; "Notes" = "Used as the preferred complete delivery address when creating or updating Shopify orders." }
     [pscustomobject]@{ "Source Column" = "Cart Quantity"; "Matrixify Column / Handling" = "Line: Quantity (expanded into unit rows), Odoo Cart Quantity"; "Action" = "Derived"; "Notes" = "Used to expand rows so the Shopify file matches the source quantity count." }
     [pscustomobject]@{ "Source Column" = "Mobile"; "Matrixify Column / Handling" = "Phone, Additional Details, Odoo Mobile"; "Action" = "Derived + Copied"; "Notes" = "Normalized to +65 where possible; original value preserved." }
     [pscustomobject]@{ "Source Column" = "Order Status"; "Matrixify Column / Handling" = "Additional Details, Odoo Order Status"; "Action" = "Copied to audit/detail"; "Notes" = "Not mapped to fulfillment because Matrixify requires fulfillment lines for shipped/delivered status." }
@@ -421,6 +474,11 @@ $mappingRows = @(
     [pscustomobject]@{ "Source Column" = "Shipping Status"; "Matrixify Column / Handling" = "Additional Details, Odoo Shipping Status"; "Action" = "Copied to audit/detail"; "Notes" = "Not mapped to Shopify fulfillment status because fulfillment lines are required." }
     [pscustomobject]@{ "Source Column" = "Delivery Date"; "Matrixify Column / Handling" = "Odoo Delivery Date"; "Action" = "Not imported"; "Notes" = "Source column is blank for all rows." }
     [pscustomobject]@{ "Source Column" = "Transactions"; "Matrixify Column / Handling" = "Odoo Transactions"; "Action" = "Not imported"; "Notes" = "Source column is blank for all rows, so no transaction rows were created." }
+    [pscustomobject]@{ "Source Column" = "Marketplace"; "Matrixify Column / Handling" = "Additional Details, Odoo Marketplace"; "Action" = "Copied to order details"; "Notes" = "Preserved on the Shopify order as an additional detail/custom attribute." }
+    [pscustomobject]@{ "Source Column" = "Marketplace Ref"; "Matrixify Column / Handling" = "Additional Details, Odoo Marketplace Ref"; "Action" = "Copied to order details"; "Notes" = "Preserved on the Shopify order as the marketplace reference." }
+    [pscustomobject]@{ "Source Column" = "Warehouse"; "Matrixify Column / Handling" = "Additional Details, Odoo Warehouse"; "Action" = "Copied to order details"; "Notes" = "Preserved on the Shopify order for fulfillment/audit context." }
+    [pscustomobject]@{ "Source Column" = "Marketplace Order ID"; "Matrixify Column / Handling" = "Additional Details, Odoo Marketplace ID"; "Action" = "Copied to order details"; "Notes" = "Preserved on the Shopify order as the marketplace order ID." }
+    [pscustomobject]@{ "Source Column" = "Marketplace Channel"; "Matrixify Column / Handling" = "Additional Details, Odoo Marketplace Channel"; "Action" = "Copied to order details"; "Notes" = "Preserved on the Shopify order as the marketplace channel." }
 )
 
 $matrixifyRows | Export-Csv -Path $OutputPath -NoTypeInformation -Encoding UTF8

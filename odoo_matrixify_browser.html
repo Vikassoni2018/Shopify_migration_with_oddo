@@ -383,6 +383,25 @@
             color: var(--muted);
         }
 
+        .progress-counter {
+            min-width: 220px;
+            text-align: right;
+            color: var(--muted);
+        }
+
+        .progress-counter strong {
+            display: block;
+            font-size: 1.8rem;
+            line-height: 1;
+            color: var(--accent);
+        }
+
+        .progress-counter span {
+            display: block;
+            margin-top: 6px;
+            line-height: 1.35;
+        }
+
         .table-wrap {
             overflow: auto;
             border-top: 1px solid var(--line);
@@ -467,7 +486,7 @@
                     </div>
                     <div class="mini">
                         <strong>Create or update</strong>
-                        <span>Missing orders are created. Existing orders are updated with note, phone, and custom attributes.</span>
+                        <span>Missing orders are created. Existing orders are updated with note, phone, delivery address, and custom attributes.</span>
                     </div>
                     <div class="mini">
                         <strong>Matrixify still included</strong>
@@ -496,6 +515,7 @@
                     </div>
                     <div class="actions">
                         <button class="primary" id="connectButton">Connect Store</button>
+                        <span class="badge pending" id="shopBadge">Not connected</span>
                     </div>
                     <div class="meta-box" id="shopMeta">
                         <strong>Not connected yet</strong>
@@ -527,49 +547,21 @@
             </div>
         </section>
 
-        <section class="section hidden" id="previewSection">
-            <div class="stats-grid" id="previewStats"></div>
-
-            <div class="preview-card">
-                <div class="preview-top">
-                    <div>
-                        <h3>Prepared order preview</h3>
-                        <p>The first five rows below are what the converter generated from the uploaded Odoo file.</p>
-                    </div>
-                    <span class="badge pending" id="shopBadge">Not connected</span>
-                </div>
-                <div class="table-wrap">
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>Name</th>
-                                <th>Processed At</th>
-                                <th>Line Title</th>
-                                <th>Line Price</th>
-                                <th>Phone</th>
-                                <th>Quantity Note</th>
-                            </tr>
-                        </thead>
-                        <tbody id="previewBody"></tbody>
-                    </table>
-                </div>
-            </div>
-        </section>
-
         <section class="section hidden" id="importSection">
-            <div class="stats-grid" id="jobStats"></div>
-
             <div class="table-card">
                 <div class="preview-top">
                     <div>
                         <h3>Shopify import progress</h3>
-                        <p>Recent order results are shown here while the import is running.</p>
+                        <p>Latest five created, updated, or failed orders are shown here while the import is running.</p>
                     </div>
                     <div class="actions" style="margin-top:0">
+                        <div class="progress-counter" id="jobProgressCounter">
+                            <strong>0 / 0</strong>
+                            <span>created 0, updated 0, failed 0</span>
+                        </div>
                         <button class="secondary" id="downloadResultsButton" disabled>Download Import Results CSV</button>
                     </div>
                 </div>
-                <div class="warning-list hidden" id="jobWarnings"></div>
                 <div class="table-wrap">
                     <table>
                         <thead>
@@ -589,12 +581,6 @@
         </section>
 
         <section class="section hidden" id="batchImportSection">
-            <div class="card">
-                <h2>Import to Shopify in 1,000-order batches</h2>
-                <p>The uploaded Odoo CSV is split by order number. Import one batch at a time so Shopify's order-create limits are easier to manage.</p>
-                <div class="status" id="batchStatus"></div>
-            </div>
-
             <div class="table-card" id="batchProgressCard">
                 <div class="preview-top">
                     <div>
@@ -602,6 +588,7 @@
                         <p>Each row imports only that batch of order references through the normal Shopify import flow.</p>
                     </div>
                 </div>
+                <div class="status" id="batchStatus"></div>
                 <div class="table-wrap">
                     <table>
                         <thead>
@@ -629,6 +616,7 @@
                     </div>
                     <div class="actions" style="margin-top:0">
                         <button class="secondary" id="refreshSavedImportsButton">Refresh Saved Imports</button>
+                        <button class="secondary" id="clearSavedImportsButton">Clear Saved Imports & Jobs</button>
                     </div>
                 </div>
                 <div class="status" id="savedImportsStatus"></div>
@@ -742,14 +730,10 @@
             var downloadMappingButton = document.getElementById("downloadMappingButton");
             var importButton = document.getElementById("importButton");
             var fileStatus = document.getElementById("fileStatus");
-            var previewSection = document.getElementById("previewSection");
-            var previewStats = document.getElementById("previewStats");
-            var previewBody = document.getElementById("previewBody");
             var shopBadge = document.getElementById("shopBadge");
             var importSection = document.getElementById("importSection");
-            var jobStats = document.getElementById("jobStats");
+            var jobProgressCounter = document.getElementById("jobProgressCounter");
             var jobBody = document.getElementById("jobBody");
-            var jobWarnings = document.getElementById("jobWarnings");
             var jobStatus = document.getElementById("jobStatus");
             var downloadResultsButton = document.getElementById("downloadResultsButton");
             var batchImportSection = document.getElementById("batchImportSection");
@@ -758,6 +742,7 @@
             var savedImportsBody = document.getElementById("savedImportsBody");
             var savedImportsStatus = document.getElementById("savedImportsStatus");
             var refreshSavedImportsButton = document.getElementById("refreshSavedImportsButton");
+            var clearSavedImportsButton = document.getElementById("clearSavedImportsButton");
             var customerTemplateInput = document.getElementById("customerTemplateInput");
             var customerOdooInput = document.getElementById("customerOdooInput");
             var customerTemplateDropzone = document.getElementById("customerTemplateDropzone");
@@ -788,6 +773,8 @@
             var customerResult = null;
             var IMPORT_BATCH_SIZE = 1000;
             var ESTIMATED_SECONDS_PER_ORDER = 13;
+            var SHOPIFY_DOMAIN_STORAGE_KEY = "odooShopifySync.shopDomain";
+            var SHOPIFY_TOKEN_STORAGE_KEY = "odooShopifySync.accessToken";
 
             function formatFileSize(bytes) {
                 if (!Number.isFinite(bytes)) {
@@ -829,6 +816,28 @@
 
             function setHidden(element, hidden) {
                 element.classList.toggle("hidden", !!hidden);
+            }
+
+            function loadStoredShopifyCredentials() {
+                try {
+                    shopDomainInput.value = window.localStorage.getItem(SHOPIFY_DOMAIN_STORAGE_KEY) || shopDomainInput.value || "";
+                    accessTokenInput.value = window.localStorage.getItem(SHOPIFY_TOKEN_STORAGE_KEY) || accessTokenInput.value || "";
+                } catch (error) {
+                    setStatus(connectStatus, "Saved Shopify credentials could not be loaded in this browser.", "error");
+                }
+            }
+
+            function saveStoredShopifyCredentials() {
+                try {
+                    if (shopDomainInput.value.trim()) {
+                        window.localStorage.setItem(SHOPIFY_DOMAIN_STORAGE_KEY, shopDomainInput.value.trim());
+                    }
+                    if (accessTokenInput.value.trim()) {
+                        window.localStorage.setItem(SHOPIFY_TOKEN_STORAGE_KEY, accessTokenInput.value.trim());
+                    }
+                } catch (error) {
+                    setStatus(connectStatus, "Shopify credentials could not be saved in this browser.", "error");
+                }
             }
 
             function downloadText(fileName, text) {
@@ -895,10 +904,34 @@
                 return data;
             }
 
+            async function deleteJson(url) {
+                var response;
+                var data;
+
+                try {
+                    response = await fetch(url, {
+                        method: "DELETE"
+                    });
+                } catch (error) {
+                    throw new Error("Cannot reach the local sync server. Open the app from Open_Odoo_CSV_Converter.bat and make sure the browser URL is http://127.0.0.1:3456.");
+                }
+
+                try {
+                    data = await response.json();
+                } catch (error) {
+                    throw new Error("The local sync server returned an invalid response.");
+                }
+
+                if (!response.ok || !data.ok) {
+                    throw new Error(data && data.error ? data.error : "Request failed.");
+                }
+                return data;
+            }
+
             function refreshActionStates() {
                 var hasPreparedUpload = selectedFile && previewResult;
                 var hasSavedPlan = !!importPlanId;
-                var hasConnectionInput = connectedShop || shopDomainInput.value.trim() || accessTokenInput.value.trim() || hasSavedPlan;
+                var hasConnectionInput = connectedShop || (shopDomainInput.value.trim() && accessTokenInput.value.trim());
                 var canImport = (hasPreparedUpload || hasSavedPlan) && hasConnectionInput;
                 var hasMultipleBatches = importBatches.length > 1;
 
@@ -909,7 +942,7 @@
                 importButton.disabled = importInProgress || !canImport || hasMultipleBatches;
                 Array.from(batchBody.querySelectorAll("[data-batch-index]")).forEach(function (button) {
                     var batch = importBatches[Number(button.getAttribute("data-batch-index"))];
-                    button.disabled = importInProgress || !canImport || !batch || batch.status === "running";
+                    button.disabled = importInProgress || !canImport || !batch;
                 });
             }
 
@@ -1106,44 +1139,12 @@
 
             function renderPreview() {
                 if (!previewResult) {
-                    setHidden(previewSection, true);
                     setHidden(batchImportSection, true);
                     return;
                 }
 
                 importBatches = buildImportBatches();
                 renderBatchList();
-
-                var previewItems = [
-                    { label: "Orders parsed", value: previewResult.stats.ordersParsed },
-                    { label: "Output rows", value: previewResult.stats.matrixifyRowsWritten },
-                    { label: "Phones normalized", value: previewResult.stats.ordersWithNormalizedPhone },
-                    { label: "Quantity assumptions", value: previewResult.stats.ordersWithQuantityAssumptions },
-                    { label: "Import batches", value: importBatches.length },
-                    { label: "1,000 order estimate", value: formatDuration(IMPORT_BATCH_SIZE * ESTIMATED_SECONDS_PER_ORDER) }
-                ];
-
-                renderStats(previewStats, previewItems);
-
-                previewBody.innerHTML = "";
-                previewResult.matrixifyRows.slice(0, 5).forEach(function (row) {
-                    var tr = document.createElement("tr");
-                    [
-                        row["Name"],
-                        row["Processed At"],
-                        row["Line: Title"],
-                        row["Line: Price"],
-                        row["Phone"],
-                        row["Derived Quantity Note"]
-                    ].forEach(function (value) {
-                        var td = document.createElement("td");
-                        td.textContent = value || "";
-                        tr.appendChild(td);
-                    });
-                    previewBody.appendChild(tr);
-                });
-
-                setHidden(previewSection, false);
             }
 
             function renderSavedImports() {
@@ -1221,10 +1222,48 @@
                     selectedFile = null;
                     updateFileMeta();
                     applyImportPlan(response.plan);
-                    setHidden(previewSection, true);
                     setStatus(fileStatus, "Saved CSV opened from Render disk. Choose a pending batch to import or resume.", "ok");
                 } catch (error) {
                     setStatus(savedImportsStatus, error.message, "error");
+                }
+            }
+
+            async function clearSavedImportsAndJobs() {
+                if (importInProgress) {
+                    setStatus(savedImportsStatus, "An import is running. Wait for it to finish before clearing saved jobs.", "error");
+                    return;
+                }
+
+                if (!window.confirm("Clear all saved import plans and job history from this app? Shopify orders will not be deleted.")) {
+                    return;
+                }
+
+                clearSavedImportsButton.disabled = true;
+                refreshSavedImportsButton.disabled = true;
+                setStatus(savedImportsStatus, "Clearing saved imports and jobs...", "info");
+
+                try {
+                    await deleteJson("/api/import-data");
+                    savedImportPlans = [];
+                    activeImportPlan = null;
+                    importPlanId = "";
+                    importBatches = [];
+                    activeBatchIndex = -1;
+                    currentJobId = "";
+                    renderSavedImports();
+                    renderBatchList();
+                    setHidden(importSection, true);
+                    jobBody.innerHTML = "";
+                    updateJobProgressCounter(null);
+                    downloadResultsButton.disabled = true;
+                    setStatus(jobStatus, "", "");
+                    setStatus(savedImportsStatus, "Saved import plans and job history cleared.", "ok");
+                    refreshActionStates();
+                } catch (error) {
+                    setStatus(savedImportsStatus, error.message, "error");
+                } finally {
+                    clearSavedImportsButton.disabled = false;
+                    refreshSavedImportsButton.disabled = false;
                 }
             }
 
@@ -1268,20 +1307,25 @@
                 setHidden(customerPreviewSection, false);
             }
 
+            function updateJobProgressCounter(job) {
+                var summary = job && job.summary ? job.summary : {};
+                var total = summary.totalOrders || 0;
+                var processed = summary.processedOrders || 0;
+                var created = summary.createdOrders || 0;
+                var updated = summary.updatedOrders || 0;
+                var failed = summary.failedOrders || 0;
+
+                jobProgressCounter.innerHTML =
+                    "<strong>" + processed + " / " + total + "</strong>" +
+                    "<span>created " + created + ", updated " + updated + ", failed " + failed + "</span>";
+            }
+
             function renderJob(job) {
                 setHidden(importSection, false);
-
-                renderStats(jobStats, [
-                    { label: "Total orders", value: job.summary.totalOrders },
-                    { label: "Processed", value: job.summary.processedOrders },
-                    { label: "Pending", value: job.pendingOrders || Math.max(0, job.summary.totalOrders - job.summary.processedOrders) },
-                    { label: "Created", value: job.summary.createdOrders },
-                    { label: "Updated", value: job.summary.updatedOrders },
-                    { label: "Failed", value: job.summary.failedOrders }
-                ]);
+                updateJobProgressCounter(job);
 
                 jobBody.innerHTML = "";
-                job.recentResults.forEach(function (result) {
+                (job.recentResults || []).slice(-5).reverse().forEach(function (result) {
                     var tr = document.createElement("tr");
                     [
                         result.orderReference,
@@ -1297,25 +1341,12 @@
                     jobBody.appendChild(tr);
                 });
 
-                jobWarnings.innerHTML = "";
-                if (job.warnings && job.warnings.length) {
-                    job.warnings.forEach(function (warningText) {
-                        var warning = document.createElement("div");
-                        warning.className = "warning";
-                        warning.textContent = warningText;
-                        jobWarnings.appendChild(warning);
-                    });
-                    setHidden(jobWarnings, false);
-                } else {
-                    setHidden(jobWarnings, true);
-                }
-
                 downloadResultsButton.disabled = !job.id;
 
                 if (job.status === "running" || job.status === "queued") {
                     importInProgress = true;
                     refreshActionStates();
-                    setStatus(jobStatus, job.statusMessage || "Import is running. Existing Shopify orders are updated only with note, phone, and custom attributes.", "info");
+                    setStatus(jobStatus, job.statusMessage || "Import is running. Existing Shopify orders are updated with note, phone, delivery address, and custom attributes.", "info");
                 } else if (job.status === "completed") {
                     importInProgress = false;
                     refreshActionStates();
@@ -1381,7 +1412,6 @@
                 activeBatchIndex = -1;
                 importPlanId = "";
                 activeImportPlan = null;
-                setHidden(previewSection, true);
                 setHidden(batchImportSection, true);
                 batchBody.innerHTML = "";
                 updateFileMeta();
@@ -1430,8 +1460,9 @@
                     };
                     var response = await postJson("/api/connect", payload);
                     connectedShop = response;
+                    saveStoredShopifyCredentials();
                     renderConnection();
-                    setStatus(connectStatus, "Connected successfully.", "ok");
+                    setStatus(connectStatus, "Connected successfully. Domain and token saved in this browser for resume.", "ok");
                 } catch (error) {
                     connectedShop = null;
                     renderConnection();
@@ -1504,6 +1535,7 @@
                 setStatus(jobStatus, batch ? "Starting Shopify import job for batch " + batch.number + "..." : "Starting Shopify import job...", "info");
 
                 try {
+                    saveStoredShopifyCredentials();
                     var payload = {
                         shopDomain: shopDomainInput.value,
                         accessToken: accessTokenInput.value,
@@ -1597,6 +1629,16 @@
 
             connectButton.addEventListener("click", function () {
                 connectStore();
+            });
+
+            shopDomainInput.addEventListener("input", function () {
+                saveStoredShopifyCredentials();
+                refreshActionStates();
+            });
+
+            accessTokenInput.addEventListener("input", function () {
+                saveStoredShopifyCredentials();
+                refreshActionStates();
             });
 
             fileInput.addEventListener("change", function (event) {
@@ -1717,6 +1759,10 @@
                 loadSavedImports();
             });
 
+            clearSavedImportsButton.addEventListener("click", function () {
+                clearSavedImportsAndJobs();
+            });
+
             prepareCustomerButton.addEventListener("click", function () {
                 prepareCustomerCsv();
             });
@@ -1742,6 +1788,7 @@
                 window.location.href = "/api/jobs/" + encodeURIComponent(currentJobId) + "/results.csv";
             });
 
+            loadStoredShopifyCredentials();
             renderConnection();
             updateFileMeta();
             refreshActionStates();

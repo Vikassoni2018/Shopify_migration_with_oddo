@@ -6,14 +6,9 @@ const converter = require("./odoo_matrixify_converter.js");
 
 const PORT = Number(process.env.PORT || 3456);
 const API_VERSION = "2026-04";
-const IS_HOSTED_DEPLOYMENT = !!(process.env.RENDER || process.env.RAILWAY_ENVIRONMENT || process.env.RAILWAY_SERVICE_ID);
-const HOST = process.env.HOST || (IS_HOSTED_DEPLOYMENT ? "0.0.0.0" : "127.0.0.1");
+const HOST = process.env.HOST || (process.env.RENDER ? "0.0.0.0" : "127.0.0.1");
 const MAX_JSON_BODY_BYTES = 100 * 1024 * 1024;
-const DATA_DIR = process.env.DATA_DIR
-    ? path.resolve(process.env.DATA_DIR)
-    : process.env.RAILWAY_VOLUME_MOUNT_PATH
-        ? path.resolve(process.env.RAILWAY_VOLUME_MOUNT_PATH)
-        : __dirname;
+const DATA_DIR = process.env.DATA_DIR ? path.resolve(process.env.DATA_DIR) : __dirname;
 const LOG_DIR = path.join(DATA_DIR, "logs");
 const JOBS_DIR = path.join(DATA_DIR, "jobs");
 const IMPORT_PLANS_DIR = path.join(DATA_DIR, "import-plans");

@@ -911,14 +911,41 @@ function getImportPlanPayload(plan) {
     };
 }
 
+function getPayloadOrderReferences(payload) {
+    if (!Array.isArray(payload.orderReferences)) {
+        return [];
+    }
+
+    const seen = new Set();
+    const references = [];
+    payload.orderReferences.forEach((reference) => {
+        const value = String(reference || "").trim();
+        if (!value || seen.has(value)) {
+            return;
+        }
+
+        seen.add(value);
+        references.push(value);
+    });
+
+    return references;
+}
+
 function createImportPlan(payload) {
     const csvText = String(payload.csvText || "");
     if (!csvText.trim()) {
         throw new Error("Upload an Odoo CSV before saving the import plan.");
     }
 
-    const importBuild = buildApiImportOrders(csvText, payload.timeZoneOffset);
-    const orderReferences = getUniqueOrderReferences(importBuild.apiOrders);
+    let orderReferences = getPayloadOrderReferences(payload);
+    let stats = payload.stats && typeof payload.stats === "object" ? payload.stats : null;
+
+    if (!orderReferences.length || !stats) {
+        const importBuild = buildApiImportOrders(csvText, payload.timeZoneOffset);
+        orderReferences = getUniqueOrderReferences(importBuild.apiOrders);
+        stats = importBuild.converted.stats;
+    }
+
     const planId = crypto.randomUUID();
     const now = new Date().toISOString();
     const plan = {
@@ -929,7 +956,7 @@ function createImportPlan(payload) {
         csvFilePath: getImportPlanCsvPath(planId),
         csvBytes: Buffer.byteLength(csvText, "utf8"),
         timeZoneOffset: payload.timeZoneOffset || "",
-        stats: importBuild.converted.stats,
+        stats,
         totalOrders: orderReferences.length,
         batchSize: IMPORT_BATCH_SIZE,
         batches: createImportPlanBatches(orderReferences)

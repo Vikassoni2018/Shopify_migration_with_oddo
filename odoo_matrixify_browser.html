@@ -1220,7 +1220,9 @@
                 var response = await postJson("/api/import-plans", {
                     csvText: csvText,
                     sourceFileName: selectedFile ? selectedFile.name : "odoo-orders.csv",
-                    timeZoneOffset: (timeZoneOffsetInput.value || "").trim() || "+08:00"
+                    timeZoneOffset: (timeZoneOffsetInput.value || "").trim() || "+08:00",
+                    orderReferences: getPreviewOrderReferences(),
+                    stats: previewResult ? previewResult.stats : null
                 });
 
                 applyImportPlan(response.plan);

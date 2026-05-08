@@ -624,6 +624,57 @@ function getRowOrderReference(row) {
     )).trim();
 }
 
+function forEachCsvRecord(csvText, onRecord) {
+    const text = String(csvText || "");
+    let record = [];
+    let field = "";
+    let inQuotes = false;
+    let index = 0;
+
+    function pushRecord() {
+        if (record.length || field) {
+            record.push(field);
+            onRecord(record);
+        }
+        record = [];
+        field = "";
+    }
+
+    while (index < text.length) {
+        const char = text[index];
+
+        if (inQuotes) {
+            if (char === "\"") {
+                if (text[index + 1] === "\"") {
+                    field += "\"";
+                    index += 2;
+                    continue;
+                }
+                inQuotes = false;
+            } else {
+                field += char;
+            }
+            index += 1;
+            continue;
+        }
+
+        if (char === "\"") {
+            inQuotes = true;
+        } else if (char === ",") {
+            record.push(field);
+            field = "";
+        } else if (char === "\n") {
+            pushRecord();
+        } else if (char !== "\r") {
+            field += char;
+        }
+
+        index += 1;
+    }
+
+    pushRecord();
+}
+
 function buildCsvForOrderReferences(csvText, orderReferences) {
     const requestedReferences = Array.isArray(orderReferences)
         ? orderReferences.map((reference) => String(reference || "").trim()).filter(Boolean)
@@ -634,30 +685,69 @@ function buildCsvForOrderReferences(csvText, orderReferences) {
     }
 
     const requestedSet = new Set(requestedReferences);
-    const document = converter.parseCsvDocument(String(csvText || ""));
-    const rows = document.rows.filter((row) => requestedSet.has(getRowOrderReference(row)));
+    let headers = [];
+    let referenceIndex = -1;
+    const rows = [];
+
+    forEachCsvRecord(csvText, (record) => {
+        if (!headers.length) {
+            headers = record;
+            referenceIndex = headers.findIndex((header) => (
+                header === "Order Reference"
+                || header === "Odoo Order Reference"
+                || header === "Name"
+                || header === "Source Identifier"
+            ));
+            return;
+        }
+
+        const reference = referenceIndex >= 0 ? String(record[referenceIndex] || "").trim() : "";
+        if (!requestedSet.has(reference)) {
+            return;
+        }
+
+        const row = {};
+        headers.forEach((header, index) => {
+            row[header] = record[index] || "";
+        });
+        rows.push(row);
+    });
 
     if (!rows.length) {
         throw new Error("The selected batch did not match any orders in the saved CSV.");
     }
 
-    return converter.toCsv(rows, document.headers);
+    return converter.toCsv(rows, headers);
 }
 
 function buildStatsFromCsvText(csvText) {
-    const document = converter.parseCsvDocument(String(csvText || ""));
+    let headers = [];
+    let sourceRowsRead = 0;
+    let referenceIndex = -1;
     const seenReferences = new Set();
 
-    document.rows.forEach((row) => {
-        const reference = getRowOrderReference(row);
+    forEachCsvRecord(csvText, (record) => {
+        if (!headers.length) {
+            headers = record;
+            referenceIndex = headers.findIndex((header) => (
+                header === "Order Reference"
+                || header === "Odoo Order Reference"
+                || header === "Name"
+                || header === "Source Identifier"
+            ));
+            return;
+        }
+
+        sourceRowsRead += 1;
+        const reference = referenceIndex >= 0 ? String(record[referenceIndex] || "").trim() : "";
         if (reference) {
             seenReferences.add(reference);
         }
     });
 
     return {
-        sourceColumns: document.headers.length,
-        sourceRowsRead: document.rows.length,
+        sourceColumns: headers.length,
+        sourceRowsRead,
         sourceOrdersParsed: seenReferences.size,
         matrixifyRowsWritten: 0
     };

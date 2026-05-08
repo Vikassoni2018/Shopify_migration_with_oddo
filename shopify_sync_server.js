@@ -2089,7 +2089,7 @@ async function handleApiRequest(request, response) {
 
                 const payload = await readJsonBody(request);
                 const job = startImportPlanBatch(plan, batch, payload);
-                sendJson(response, 202, {
+                sendJson(response, 200, {
                     ok: true,
                     job: getJobPayload(job),
                     plan: getImportPlanPayload(loadImportPlan(plan.id) || plan)

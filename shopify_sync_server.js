@@ -2,10 +2,7 @@ const http = require("http");
 const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
-const nodemailer = require("nodemailer");
 const converter = require("./odoo_matrixify_converter.js");
-
-loadEnvFile(path.join(__dirname, ".env"));
 
 const PORT = Number(process.env.PORT || 3456);
 const API_VERSION = "2026-04";
@@ -17,41 +14,12 @@ const JOBS_DIR = path.join(DATA_DIR, "jobs");
 const IMPORT_PLANS_DIR = path.join(DATA_DIR, "import-plans");
 const IMPORT_LOG_PATH = path.join(LOG_DIR, "shopify_import_debug.log");
 const CONNECTION_PATH = path.join(DATA_DIR, "connection.json");
-const SMTP_URL = String(process.env.SMTP_URL || "").trim();
-const ALERT_EMAIL_TO = String(process.env.ALERT_EMAIL_TO || "vikassoni2018@gmail.com").trim();
 const IMPORT_BATCH_SIZE = Number(process.env.IMPORT_BATCH_SIZE || 1000);
 const ORDER_CREATE_SPACING_MS = Number(process.env.ORDER_CREATE_SPACING_MS || 5000);
 const SHOPIFY_THROTTLE_RETRY_WAIT_MS = Number(process.env.SHOPIFY_THROTTLE_RETRY_WAIT_MS || 65000);
 const SHOPIFY_THROTTLE_MAX_ATTEMPTS = Number(process.env.SHOPIFY_THROTTLE_MAX_ATTEMPTS || 8);
 const jobs = new Map();
 const lastOrderCreateAttemptByShop = new Map();
-
-function loadEnvFile(filePath) {
-    if (!fs.existsSync(filePath)) {
-        return;
-    }
-
-    const lines = fs.readFileSync(filePath, "utf8").split(/\r?\n/);
-    lines.forEach((line) => {
-        const trimmed = line.trim();
-        const separatorIndex = trimmed.indexOf("=");
-
-        if (!trimmed || trimmed.startsWith("#") || separatorIndex < 1) {
-            return;
-        }
-
-        const key = trimmed.slice(0, separatorIndex).trim();
-        let value = trimmed.slice(separatorIndex + 1).trim();
-
-        if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
-            value = value.slice(1, -1);
-        }
-
-        if (!process.env[key]) {
-            process.env[key] = value;
-        }
-    });
-}
 
 const SHOP_QUERY = `
 query AppShopInfo {
@@ -502,8 +470,7 @@ function getJobSnapshot(job) {
         orderReferences: Array.isArray(job.orderReferences) ? job.orderReferences : [],
         timeZoneOffset: job.timeZoneOffset || "",
         importPlanId: job.importPlanId || "",
-        importPlanBatchNumber: job.importPlanBatchNumber || 0,
-        interruptedAlertSentAt: job.interruptedAlertSentAt || ""
+        importPlanBatchNumber: job.importPlanBatchNumber || 0
     };
 }
 
@@ -568,8 +535,7 @@ function loadPersistedJob(jobId) {
         orderReferences: Array.isArray(saved.orderReferences) ? saved.orderReferences : [],
         timeZoneOffset: saved.timeZoneOffset || "",
         importPlanId: saved.importPlanId || "",
-        importPlanBatchNumber: Number(saved.importPlanBatchNumber || 0),
-        interruptedAlertSentAt: saved.interruptedAlertSentAt || ""
+        importPlanBatchNumber: Number(saved.importPlanBatchNumber || 0)
     };
 
     recalculateJobSummary(job);
@@ -619,84 +585,6 @@ function getPublicAppUrl() {
     }
 
     return `http://${HOST}:${PORT}`;
-}
-
-function getInterruptedJobsForAlert() {
-    return listPersistedJobs().filter((job) => {
-        const summary = job.summary || getDefaultSummary();
-        const totalOrders = Number(summary.totalOrders || 0);
-        const processedOrders = Number(summary.processedOrders || 0);
-        const pendingOrders = Math.max(0, totalOrders - processedOrders);
-        return job.status === "queued"
-            && !job.interruptedAlertSentAt
-            && pendingOrders > 0
-            && String(job.statusMessage || "").includes("Previous run was interrupted");
-    });
-}
-
-async function sendInterruptedJobAlert(job) {
-    if (!SMTP_URL || !ALERT_EMAIL_TO) {
-        writeImportLog("interrupted_job_alert_skipped", {
-            jobId: job.id,
-            reason: "SMTP_URL or ALERT_EMAIL_TO is not configured"
-        });
-        return false;
-    }
-
-    const summary = job.summary || getDefaultSummary();
-    const totalOrders = Number(summary.totalOrders || 0);
-    const processedOrders = Number(summary.processedOrders || 0);
-    const pendingOrders = Math.max(0, totalOrders - processedOrders);
-    const appUrl = getPublicAppUrl();
-    const subject = `Shopify import interrupted: ${job.sourceFileName || job.batchLabel || job.id}`;
-    const lines = [
-        "A Shopify import job was interrupted and needs resume.",
-        "",
-        `Job ID: ${job.id}`,
-        `Source file: ${job.sourceFileName || "Odoo CSV"}`,
-        `Batch: ${job.batchLabel || "Batch"}`,
-        `Shop: ${job.shopDomain || "Not saved"}`,
-        `Processed: ${processedOrders} of ${totalOrders}`,
-        `Created: ${summary.createdOrders || 0}`,
-        `Updated: ${summary.updatedOrders || 0}`,
-        `Failed: ${summary.failedOrders || 0}`,
-        `Remaining: ${pendingOrders}`,
-        "",
-        `Open the app and click Resume Batch: ${appUrl}`
-    ];
-
-    const transporter = nodemailer.createTransport(SMTP_URL);
-    await transporter.sendMail({
-        from: process.env.ALERT_EMAIL_FROM || process.env.SMTP_FROM || "Odoo Shopify Sync <no-reply@localhost>",
-        to: ALERT_EMAIL_TO,
-        subject,
-        text: lines.join("\n")
-    });
-
-    job.interruptedAlertSentAt = new Date().toISOString();
-    savePersistedJob(job);
-    writeImportLog("interrupted_job_alert_sent", {
-        jobId: job.id,
-        to: ALERT_EMAIL_TO,
-        processedOrders,
-        pendingOrders
-    });
-    return true;
-}
-
-async function sendInterruptedJobAlertsOnStartup() {
-    const interruptedJobs = getInterruptedJobsForAlert();
-
-    for (const job of interruptedJobs) {
-        try {
-            await sendInterruptedJobAlert(job);
-        } catch (error) {
-            writeImportLog("interrupted_job_alert_failed", {
-                jobId: job.id,
-                message: error.message
-            });
-        }
-    }
 }
 
 function getJobCsvText(job) {
@@ -1526,6 +1414,10 @@ function buildApiImportOrders(csvText, timeZoneOffset) {
             orderInput.phone = String(firstRow.Phone).trim();
         }
 
+        if (firstRow.Email) {
+            orderInput.email = String(firstRow.Email).trim();
+        }
+
         if (shippingAddress) {
             orderInput.shippingAddress = shippingAddress;
         }
@@ -1754,6 +1646,10 @@ async function updateOrder(shopDomain, accessToken, existingOrder, orderInput, c
 
     if (orderInput.phone) {
         input.phone = orderInput.phone;
+    }
+
+    if (orderInput.email) {
+        input.email = orderInput.email;
     }
 
     if (orderInput.shippingAddress) {
@@ -2379,7 +2275,6 @@ server.listen(PORT, HOST, () => {
         url: `http://${HOST}:${PORT}`,
         apiVersion: API_VERSION
     });
-    sendInterruptedJobAlertsOnStartup();
 });
 
 server.on("error", (error) => {

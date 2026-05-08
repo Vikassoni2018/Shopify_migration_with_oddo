@@ -33,9 +33,3 @@ services:
         sync: false
       - key: SHOPIFY_ACCESS_TOKEN
         sync: false
-      - key: SMTP_URL
-        sync: false
-      - key: ALERT_EMAIL_TO
-        value: vikassoni2018@gmail.com
-      - key: APP_URL
-        sync: false

@@ -279,3 +279,4 @@
 {"timestamp":"2026-05-08T06:11:38.338Z","event":"server_started","url":"http://127.0.0.1:3456","apiVersion":"2026-04"}
 {"timestamp":"2026-05-08T06:19:44.056Z","event":"server_started","url":"http://127.0.0.1:3456","apiVersion":"2026-04"}
 {"timestamp":"2026-05-08T06:31:39.909Z","event":"server_started","url":"http://127.0.0.1:3456","apiVersion":"2026-04"}
+{"timestamp":"2026-05-08T07:12:57.521Z","event":"import_plan_saved","importPlanId":"a3626e14-6126-41eb-995f-143161b1c448","sourceFileName":"sale.order (1).csv","csvBytes":39391,"totalOrders":50,"batchCount":1}

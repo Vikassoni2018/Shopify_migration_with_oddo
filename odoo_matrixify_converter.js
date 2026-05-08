@@ -18,6 +18,7 @@
         "Source Identifier",
         "Payment: Status",
         "Phone",
+        "Email",
         "Note",
         "Additional Details",
         "Line: Type",
@@ -31,6 +32,7 @@
         "Odoo Currency",
         "Odoo Delivery Address",
         "Odoo Customer/Contact Address Complete",
+        "Odoo Customer Email",
         "Odoo Cart Quantity",
         "Odoo Mobile",
         "Odoo Order Status",
@@ -99,6 +101,12 @@
             "Matrixify Column / Handling": "Additional Details, Shopify shipping address, Odoo Customer/Contact Address Complete",
             "Action": "Copied to order details and shipping address",
             "Notes": "Used as the preferred complete delivery address when creating or updating Shopify orders."
+        },
+        {
+            "Source Column": "Customer/Email",
+            "Matrixify Column / Handling": "Email, Additional Details, Odoo Customer Email",
+            "Action": "Copied to order email and details",
+            "Notes": "Used as the Shopify order email when present and preserved in order details."
         },
         {
             "Source Column": "Cart Quantity",
@@ -526,6 +534,10 @@
 
         if (order.customerContactAddressComplete) {
             details.push(formatMatrixifyKeyValueLine("Odoo Customer/Contact Address Complete", order.customerContactAddressComplete));
+        }
+
+        if (order.customerEmail) {
+            details.push(formatMatrixifyKeyValueLine("Odoo Customer Email", order.customerEmail));
         }
 
         if (order.mobileRaw) {
@@ -1277,6 +1289,7 @@
                     currency: getStringValue(row["Currency"]),
                     deliveryAddress: getStringValue(row["Delivery Address"]),
                     customerContactAddressComplete: getStringValue(row["Customer/Contact Address Complete"]),
+                    customerEmail: getStringValue(row["Customer/Email"]),
                     cartQuantityRaw: getStringValue(row["Cart Quantity"]),
                     cartQuantity: parseIntOrNull(row["Cart Quantity"]),
                     mobileRaw: getStringValue(row["Mobile"]),
@@ -1397,6 +1410,7 @@
                     "Source Identifier": order.orderReference,
                     "Payment: Status": order.paymentStatus || "paid",
                     "Phone": order.normalizedPhone,
+                    "Email": order.customerEmail,
                     "Note": orderNote,
                     "Additional Details": additionalDetails,
                     "Line: Type": "Line Item",
@@ -1410,6 +1424,7 @@
                     "Odoo Currency": order.currency,
                     "Odoo Delivery Address": order.deliveryAddress,
                     "Odoo Customer/Contact Address Complete": order.customerContactAddressComplete,
+                    "Odoo Customer Email": order.customerEmail,
                     "Odoo Cart Quantity": order.cartQuantityRaw,
                     "Odoo Mobile": order.mobileRaw,
                     "Odoo Order Status": order.orderStatus,

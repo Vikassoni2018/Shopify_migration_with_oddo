@@ -187,6 +187,10 @@ function Get-AdditionalDetails {
         $details.Add((Format-MatrixifyKeyValueLine -Key "Odoo Customer/Contact Address Complete" -Value $Order.CustomerContactAddressComplete))
     }
 
+    if ($Order.CustomerEmail) {
+        $details.Add((Format-MatrixifyKeyValueLine -Key "Odoo Customer Email" -Value $Order.CustomerEmail))
+    }
+
     if ($Order.MobileRaw) {
         $details.Add((Format-MatrixifyKeyValueLine -Key "Odoo Mobile" -Value $Order.MobileRaw))
     }
@@ -280,6 +284,7 @@ foreach ($row in $sourceRows) {
             Currency = Get-StringValue $row.Currency
             DeliveryAddress = Get-StringValue $row."Delivery Address"
             CustomerContactAddressComplete = Get-StringValue $row."Customer/Contact Address Complete"
+            CustomerEmail = Get-StringValue $row."Customer/Email"
             CartQuantityRaw = Get-StringValue $row."Cart Quantity"
             CartQuantity = Parse-IntOrNull $row."Cart Quantity"
             MobileRaw = Get-StringValue $row.Mobile
@@ -412,6 +417,7 @@ foreach ($order in $orders) {
             "Source Identifier" = $order.OrderReference
             "Payment: Status" = if ($order.PaymentStatus) { $order.PaymentStatus } else { "paid" }
             Phone = $order.NormalizedPhone
+            Email = $order.CustomerEmail
             Note = $orderNote
             "Additional Details" = $additionalDetails
             "Line: Type" = "Line Item"
@@ -425,6 +431,7 @@ foreach ($order in $orders) {
             "Odoo Currency" = $order.Currency
             "Odoo Delivery Address" = $order.DeliveryAddress
             "Odoo Customer/Contact Address Complete" = $order.CustomerContactAddressComplete
+            "Odoo Customer Email" = $order.CustomerEmail
             "Odoo Cart Quantity" = $order.CartQuantityRaw
             "Odoo Mobile" = $order.MobileRaw
             "Odoo Order Status" = $order.OrderStatus
@@ -459,6 +466,7 @@ $mappingRows = @(
     [pscustomobject]@{ "Source Column" = "Currency"; "Matrixify Column / Handling" = "Currency, Odoo Currency"; "Action" = "Renamed + Copied"; "Notes" = "Kept as the Shopify order currency." }
     [pscustomobject]@{ "Source Column" = "Delivery Address"; "Matrixify Column / Handling" = "Additional Details, Odoo Delivery Address"; "Action" = "Copied to audit/detail"; "Notes" = "Not mapped to Shopify address fields because the export contains names, not structured addresses." }
     [pscustomobject]@{ "Source Column" = "Customer/Contact Address Complete"; "Matrixify Column / Handling" = "Additional Details, Shopify shipping address, Odoo Customer/Contact Address Complete"; "Action" = "Copied to order details and shipping address"; "Notes" = "Used as the preferred complete delivery address when creating or updating Shopify orders." }
+    [pscustomobject]@{ "Source Column" = "Customer/Email"; "Matrixify Column / Handling" = "Email, Additional Details, Odoo Customer Email"; "Action" = "Copied to order email and details"; "Notes" = "Used as the Shopify order email when present and preserved in order details." }
     [pscustomobject]@{ "Source Column" = "Cart Quantity"; "Matrixify Column / Handling" = "Line: Quantity (expanded into unit rows), Odoo Cart Quantity"; "Action" = "Derived"; "Notes" = "Used to expand rows so the Shopify file matches the source quantity count." }
     [pscustomobject]@{ "Source Column" = "Mobile"; "Matrixify Column / Handling" = "Phone, Additional Details, Odoo Mobile"; "Action" = "Derived + Copied"; "Notes" = "Normalized to +65 where possible; original value preserved." }
     [pscustomobject]@{ "Source Column" = "Order Status"; "Matrixify Column / Handling" = "Additional Details, Odoo Order Status"; "Action" = "Copied to audit/detail"; "Notes" = "Not mapped to fulfillment because Matrixify requires fulfillment lines for shipped/delivered status." }
